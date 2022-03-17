@@ -1,0 +1,268 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2014 TEI of Western Macedonia, Greece
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Author: Dimitrios J. Vergados <djvergad@gmail.com>
+ */
+
+#include "ns3/log.h"
+#include "ns3/nstime.h"
+#include "ns3/simulator.h"
+#include "http-header.h"
+#include "mpeg-header.h"
+#include "mpeg-player.h"
+#include "dash-client.h"
+#include <cmath>
+
+NS_LOG_COMPONENT_DEFINE ("MpegPlayer");
+namespace ns3 {
+
+FrameBuffer::FrameBuffer (uint32_t &capacity) : m_capacity (capacity)
+{
+}
+
+bool
+FrameBuffer::push (Ptr<Packet> frame)
+{
+  NS_LOG_FUNCTION (this);
+  if (m_size_in_bytes + frame->GetSerializedSize () <= m_capacity)
+    {
+      m_queue.push (frame);
+      NS_LOG_INFO ("pushing packet with size = " << frame->GetSize () << " serialized = "
+                                                 << frame->GetSerializedSize ());
+
+      m_size_in_bytes += frame->GetSerializedSize ();
+      return true;
+    }
+  else
+    {
+      return false;
+    }
+}
+
+Ptr<Packet>
+FrameBuffer::pop ()
+{
+  NS_LOG_FUNCTION (this);
+  Ptr<Packet> frame = m_queue.front ();
+  m_queue.pop ();
+  NS_LOG_INFO ("popping packet with size = " << frame->GetSize ()
+                                             << " serialized = " << frame->GetSerializedSize ());
+
+  m_size_in_bytes -= frame->GetSerializedSize ();
+  return frame;
+}
+
+int
+FrameBuffer::size ()
+{
+  NS_LOG_FUNCTION (this);
+  return m_queue.size ();
+}
+
+bool
+FrameBuffer::empty ()
+{
+  NS_LOG_FUNCTION (this);
+  return m_queue.empty ();
+}
+
+MpegPlayer::MpegPlayer (Ptr<DashClient> dashClient, uint32_t &capacity)
+    : m_state (MPEG_PLAYER_NOT_STARTED),
+      m_interrruptions (0),
+      m_totalRate (0),
+      m_minRate (100000000),
+      m_framesPlayed (0),
+      m_frameBuffer (capacity),
+      m_bufferDelay ("0s"),	
+      m_dashClient (dashClient)
+{
+  NS_LOG_FUNCTION (this);
+}
+
+MpegPlayer::~MpegPlayer ()
+{
+  NS_LOG_FUNCTION (this);
+}
+
+int
+MpegPlayer::GetQueueSize ()
+{
+  return m_frameBuffer.size ();
+}
+
+Time
+MpegPlayer::GetRealPlayTime (Time playTime)
+{
+  NS_LOG_INFO (" Start: " << m_start_time.GetSeconds ()
+                          << " Inter: " << m_interruption_time.GetSeconds ()
+                          << " playtime: " << playTime.GetSeconds ()
+                          << " now: " << Simulator::Now ().GetSeconds () << " actual: "
+                          << (m_start_time + m_interruption_time + playTime).GetSeconds ());
+
+  return m_start_time + m_interruption_time +
+         (m_state == MPEG_PLAYER_PAUSED ? (Simulator::Now () - m_lastpaused) : Seconds (0)) +
+         playTime - Simulator::Now ();
+}
+
+bool
+MpegPlayer::ReceiveFrame (Ptr<Packet> message)
+{
+  NS_LOG_FUNCTION (this << message);
+  NS_LOG_INFO ("Received Frame " << m_state);
+
+  Ptr<Packet> msg = message->Copy ();
+
+  if (!m_frameBuffer.push (msg))
+    {
+      return false;
+    }
+
+  if (m_state == MPEG_PLAYER_PAUSED)
+    {
+      NS_LOG_INFO ("Play resumed");
+      m_state = MPEG_PLAYER_PLAYING;
+      m_interruption_time += (Simulator::Now () - m_lastpaused);
+      PlayFrame ();
+    }
+  else if (m_state == MPEG_PLAYER_NOT_STARTED)
+    {
+      NS_LOG_INFO ("Play started");
+      m_state = MPEG_INITIAL_BUFFERING;
+      Simulator::Schedule (Seconds (1), &MpegPlayer::PlayFrame, this);
+    }
+  return true;
+}
+
+void
+MpegPlayer::Start (void)
+{
+  NS_LOG_FUNCTION (this);
+  m_state = MPEG_PLAYER_PLAYING;
+  m_interruption_time = Seconds (0);
+}
+
+void
+MpegPlayer::PlayFrame (void)
+{
+  NS_LOG_FUNCTION (this);
+  if (m_state == MPEG_PLAYER_DONE)
+    {
+      return;
+    }
+  else if (m_state == MPEG_INITIAL_BUFFERING)
+    {
+      m_start_time = Simulator::Now ();
+      m_state = MPEG_PLAYER_PLAYING;
+    }
+  if (m_frameBuffer.empty ())
+    {
+      NS_LOG_INFO (Simulator::Now ().GetSeconds () << " No frames to play");
+      m_state = MPEG_PLAYER_PAUSED;
+      m_lastpaused = Simulator::Now ();
+      m_interrruptions++;
+      return;
+    }
+
+  Ptr<Packet> message = m_frameBuffer.pop ();
+
+  MPEGHeader mpeg_header;
+  HTTPHeader http_header;
+
+  message->RemoveHeader (http_header);
+  message->RemoveHeader (mpeg_header);
+
+  m_totalRate += http_header.GetResolution ();
+  if (http_header.GetSegmentId () > 0) // Discard the first segment for the minRate
+    { // calculation, as it is always the minimum rate
+      m_minRate =
+          http_header.GetResolution () < m_minRate ? http_header.GetResolution () : m_minRate;
+    }
+  m_framesPlayed++;
+
+  /*std::cerr << "res= " << http_header.GetResolution() << " tot="
+     << m_totalRate << " played=" << m_framesPlayed << std::endl;*/
+
+  // Time b_t = GetRealPlayTime (mpeg_header.GetPlaybackTime ()) + Seconds(m_frameBuffer.size() * MPEG_TIME_BETWEEN_FRAMES);
+
+  // if (m_bufferDelay > Time ("0s") && b_t < m_bufferDelay && m_dashClient)
+  //   {
+  //     NS_LOG_INFO("Requesting frame due low buffer time, b_t = " <<  b_t << " m_bufferDelay = " <<  m_bufferDelay);
+  //     m_dashClient->RequestSegment ();
+  //     m_bufferDelay = Seconds (0);
+  //     // m_dashClient = NULL;
+  //   }
+
+  //akhila2
+  // put into structure
+  MpegPlayerFrameInfo mpegInfo;
+  mpegInfo.node_id = m_dashClient->m_id + 1; //The NS_LOG below is using m_dashClient->m_id which is different from the older version from which I copied m_dashClient->GetId(), so watch out this ID could be wrong. 
+  mpegInfo.videoId = http_header.GetVideoId ();
+  mpegInfo.segId = http_header.GetSegmentId ();
+  mpegInfo.resolution = http_header.GetResolution ();
+  mpegInfo.frame_id = mpeg_header.GetFrameId ();
+  mpegInfo.playback_time = mpeg_header.GetPlaybackTime ().GetSeconds ();
+  mpegInfo.type = (char) mpeg_header.GetType ();
+  mpegInfo.size = mpeg_header.GetSize ();
+  mpegInfo.interruption_time = m_interruption_time.GetSeconds ();
+  mpegInfo.queue_size = GetQueueSize ();
+  
+  m_dashClient->ReceiveMpegTrace (mpegInfo);
+
+  /*
+  std::cerr
+	  << "MPEG_PLAYER" 
+	  << "\t" << Simulator::Now ().GetMicroSeconds ()
+          << "\t" << m_dashClient->m_id + 1 //The NS_LOG below is using m_dashClient->m_id which is different from the older version from which I copied m_dashClient->GetId(), so watch out this ID could be wrong. 
+          << "\t" << http_header.GetVideoId () 
+          << "\t" << http_header.GetSegmentId ()
+          << "\t" << http_header.GetResolution ()
+          << "\t" << mpeg_header.GetFrameId ()
+          << "\t" << mpeg_header.GetPlaybackTime ().GetSeconds ()
+          << "\t" << (char) mpeg_header.GetType ()
+          << "\t" << mpeg_header.GetSize ()
+          << "\t" << m_interruption_time.GetSeconds ()
+          //<< "\t" << GetQueueBytes ()
+          << "\t" << GetQueueSize ()
+          << std::endl;*/
+
+  NS_LOG_INFO (Simulator::Now ().GetSeconds ()
+               << " PLAYING FRAME: "
+               << " PlayerId: " << m_dashClient->m_id
+               << " VidId: " << http_header.GetVideoId () << " SegId: "
+               << http_header.GetSegmentId () << " Res: " << http_header.GetResolution ()
+               << " FrameId: " << mpeg_header.GetFrameId ()
+               << " PlayTime: " << mpeg_header.GetPlaybackTime ().GetSeconds ()
+               << " Type: " << (char) mpeg_header.GetType () << " Size: " << mpeg_header.GetSize ()
+               << " interTime: " << m_interruption_time.GetSeconds ()
+               << " queueLength: " << m_frameBuffer.size ());
+
+  /*   std::cout << " frId: " << mpeg_header.GetFrameId()
+     << " playtime: " << mpeg_header.GetPlaybackTime()
+     << " target: " << (m_start_time + m_interruption_time + mpeg_header.GetPlaybackTime()).GetSeconds()
+     << " now: " << Simulator::Now().GetSeconds()
+     << std::endl;
+     */
+  Simulator::Schedule (MilliSeconds (20), &MpegPlayer::PlayFrame, this);
+
+  // There may be space now to read a new packet from the socket
+  if (m_dashClient)
+    {
+      Simulator::Schedule (MilliSeconds (0), &DashClient::CheckBuffer, m_dashClient);
+    }
+}
+
+} // namespace ns3

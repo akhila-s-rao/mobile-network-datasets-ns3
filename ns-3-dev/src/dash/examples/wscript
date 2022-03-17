@@ -1,0 +1,13 @@
+# -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
+
+def build(bld):
+    obj = bld.create_ns3_program('dash-example', ['dash'])
+    obj.source = 'dash-example.cc'
+    obj = bld.create_ns3_program('link-example', ['dash'])
+    obj.source = 'link-example.cc'
+    obj = bld.create_ns3_program('dash-wifi', ['dash'])
+    obj.source = 'dash-wifi.cc'
+    obj = bld.create_ns3_program('lena-dash', ['dash'])
+    obj.source = 'lena-dash.cc'
+    
+

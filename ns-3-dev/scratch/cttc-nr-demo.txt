@@ -1,0 +1,20 @@
+Deployment topology: Grid using the GridScenarioHelper. Seems like the gNBs are in one row. But the scenarioHEight and SetVerticalBsDistance does not make sense...   
+
+
+
+ 
+Channel model: 3GPP channel model from TR 38.90. StreeCanyon propagation model with 0 update period and no shadowing.  
+
+
+
+Spectrum: 2 bands with one component carrier (cc) each. So 2 BandWidthParts (bwp) each having different subband numerologies.
+ 
+
+Beamforming: Direct path ideal beamforming.
+
+
+Core: 0 core latency
+
+
+
+Antennas: UEs have 2X4 antenna isotropic elements. gNBs have 4X8 isotropic elements.  
