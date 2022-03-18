@@ -405,6 +405,8 @@ void LenaLteComparison (const Parameters &params){
                                                  params.downtiltAngle);
     }
 
+  std::cout << "debug 1" << std::endl;
+
   // Check we got one valid helper
   if ( (lteHelper == nullptr) && (nrHelper == nullptr) )
     {

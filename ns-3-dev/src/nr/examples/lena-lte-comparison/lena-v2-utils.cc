@@ -158,6 +158,8 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
   nrHelper = CreateObject<NrHelper> ();
 
   Ptr<IdealBeamformingHelper> idealBeamformingHelper;
+  idealBeamformingHelper = CreateObject<IdealBeamformingHelper> ();
+  nrHelper->SetBeamformingHelper (idealBeamformingHelper);
 
   Ptr<NrPointToPointEpcHelper> epcHelper = DynamicCast<NrPointToPointEpcHelper> (baseEpcHelper);
   nrHelper->SetEpcHelper (epcHelper);
@@ -426,6 +428,8 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
       sector3Bwps = CcBwpCreator::GetAllBwps ({band0});
     }
 
+  std::cout << "debug 2" << std::endl;
+
   /*
    * Now, we can setup the attributes. We can have three kind of attributes:
    * (i) parameters that are valid for all the bandwidth parts and applies to
@@ -447,8 +451,9 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
    */
   // Beamforming method
 
+  std::cout << "debug 3" << std::endl;
   idealBeamformingHelper->SetAttribute ("BeamformingMethod", TypeIdValue (DirectPathBeamforming::GetTypeId ()));
-
+  std::cout << "debug 4" << std::endl;
   // Scheduler type
 
   if (scheduler == "PF")
@@ -473,6 +478,7 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
   epcHelper->SetAttribute ("S1uLinkDelay", TimeValue (MilliSeconds (0)));
 */
 
+  std::cout << "debug 5" << std::endl;
 
   // Antennas for all the UEs
   nrHelper->SetUeAntennaAttribute ("NumRows", UintegerValue (1));
