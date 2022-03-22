@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Prerequisites
 *.d
 
@@ -30,3 +31,58 @@
 *.exe
 *.out
 *.app
+=======
+*.diff
+*.swp
+*.orig
+*.patch
+*.rej
+*.o
+*.pyc
+*.pyo
+
+*.cwnd
+*.dat
+*.log
+*.mob
+*.pcap
+*.plt
+*.routes
+*.tr
+[D|U]l[A-Z][a-z]*Stats.txt
+
+\#*#
+*~
+
+ns-3-dev/testpy-output
+ns-3-dev/bindings/python/pybindgen/
+
+ms_print.*
+massif.*
+coverity
+TAGS
+
+ns-3-dev/.lock-ns3_*
+
+ns-3-dev/build-dir/
+ns-3-dev/build/
+/.cproject
+/.project
+
+version.cache
+
+ns-3-dev/.idea/
+ns-3-dev/cmake-cache/
+ns-3-dev/cmake-build-debug/
+ns-3-dev/cmake-build-relwithdebinfo/
+ns-3-dev/cmake-build-minsizerel/
+ns-3-dev/cmake-build-release/
+
+
+ns-3-dev/logs/
+ns-3-dev/plot
+ns-3-dev/scenario_scripts/
+ns-3-dev/.vscode/*
+!ns-3-dev/.vscode/launch.json
+!ns-3-dev/.vscode/tasks.json
+>>>>>>> master
