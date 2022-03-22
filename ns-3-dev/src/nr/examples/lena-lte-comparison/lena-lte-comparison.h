@@ -77,7 +77,7 @@ struct Parameters
   //  we will pass them inside the NR module.
   uint16_t numerologyBwp = 0;
   std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|"
-  uint32_t bandwidthMHz = 20;
+  uint32_t bandwidthMHz = 10;
 
   // Where we will store the output files.
   std::string simTag = "default";

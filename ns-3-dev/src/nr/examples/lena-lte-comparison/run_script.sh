@@ -2,18 +2,18 @@
 cd ../../../../
 pwd
 
-len=5
+len=10
 #for i in 7 8 13 14 15 
 for (( i=0; i<$len; i++ ))
 do
   cmd_args="lena-lte-comparison-user \
 	   --scenario=UMi \
 	   --numRings=1 \
-	   --ueNumPergNb=10 \
+	   --ueNumPergNb=30 \
 	   --appGenerationTime=10000 \
 	   --numerologyBwp=0 \
 	   --simulator=LENA \
-	   --trafficScenario=2 \
+	   --trafficScenario=0 \
            --randomSeed=$i"
 
   run_dir="run$(($i + 1))"  

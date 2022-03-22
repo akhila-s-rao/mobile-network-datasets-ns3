@@ -155,7 +155,7 @@ void LenaLteComparison (const Parameters &params){
    * the instances of SetDefault, but we need it for legacy code (LTE)
    */
   std::cout << "  max tx buffer size\n"; 
-  Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (999999999));
+  //Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue ());
   Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (160));
   // Set time granularity for observations that are periodic
   Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (100));//millisecond
@@ -511,7 +511,7 @@ void LenaLteComparison (const Parameters &params){
   double targetDt = 35.0;  // The target time difference between receiving and playing a frame. [s].
   double window = 10.0; // The window for measuring the average throughput. [s].
   std::istringstream iss ("ns3::FdashClient");
-  uint32_t bufferSpace = 30000000; // The space in bytes that is used for buffering the video
+  uint32_t bufferSpace = 4000000; // 4 MB The space in bytes that is used for buffering the video
 
   // Configuration parameters for UL and DL Traffic parameters for the Flows 
   uint32_t flowPacketSize = 1000;
@@ -778,10 +778,11 @@ void LenaLteComparison (const Parameters &params){
         }
       else if (nrHelper != nullptr)
         {
-          nrHelper->EnableTraces ();
+          //nrHelper->EnableTraces ();
         }
     }
 
+#if false
   Config::Connect ("/NodeList/*/ApplicationList/0/$ns3::UdpServer/RxWithAddresses", MakeBoundCallback (&delayTrace, delayStream, scenario, remoteHost));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::DashClient/RxSegment", MakeBoundCallback (&dashClientTrace, dashClientStream, scenario));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::DashClient/PlayedFrame", MakeBoundCallback (&mpegPlayerTrace, mpegPlayerStream, scenario));
@@ -790,6 +791,7 @@ void LenaLteComparison (const Parameters &params){
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ThreeGppHttpServer/RxDelay", MakeBoundCallback (&httpServerTraceRxDelay, httpServerDelayStream, scenario));
   Config::Connect ("/NodeList/*/ApplicationList/1/$ns3::UdpServer/RxWithAddresses", MakeBoundCallback (&flowTrace, flowStream, scenario, remoteHost));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::UdpEchoClient/RxWithAddresses", MakeBoundCallback (&rttTrace, rttStream, scenario));
+#endif
 
   // FlowMonitor for aggregated logs
   std::cout << "  flowmon\n";

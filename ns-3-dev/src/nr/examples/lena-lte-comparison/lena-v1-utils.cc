@@ -161,7 +161,7 @@ LenaV1Utils::SetLenaV1SimulatorParameters (const double sector0AngleRad,
   // ALL SECTORS AND BANDS configuration
   Config::SetDefault ("ns3::FfMacScheduler::UlCqiFilter", EnumValue (FfMacScheduler::PUSCH_UL_CQI));
   Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
-  Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (999999999));
+  Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (100*1024)); //default is 10*1024 = 10KB 
   Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (txPower));
   Config::SetDefault ("ns3::LteUePhy::TxPower", DoubleValue (ueTxPower));
   Config::SetDefault ("ns3::LteUePhy::NoiseFigure", DoubleValue (9.0));
