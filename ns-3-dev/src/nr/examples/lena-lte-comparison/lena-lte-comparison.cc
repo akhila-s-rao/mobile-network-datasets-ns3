@@ -35,8 +35,8 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-#include <ns3/sqlite-output.h>
-#include "flow-monitor-output-stats.h"
+//#include <ns3/sqlite-output.h>
+//#include "flow-monitor-output-stats.h"
 #include "lena-v1-utils.h"
 #include "lena-v2-utils.h"
 #include <iomanip>
@@ -793,6 +793,7 @@ void LenaLteComparison (const Parameters &params){
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::UdpEchoClient/RxWithAddresses", MakeBoundCallback (&rttTrace, rttStream, scenario));
 #endif
 
+  /*
   // FlowMonitor for aggregated logs
   std::cout << "  flowmon\n";
   FlowMonitorHelper flowmonHelper;
@@ -804,7 +805,7 @@ void LenaLteComparison (const Parameters &params){
   monitor->SetAttribute ("JitterBinWidth", DoubleValue (0.001));
   monitor->SetAttribute ("PacketSizeBinWidth", DoubleValue (20));
   std::string tableName = "e2e";
-
+*/
   std::cout << "\n----------------------------------------\n"
             << "Start simulation"
             << std::endl;
@@ -817,9 +818,9 @@ void LenaLteComparison (const Parameters &params){
   Simulator::Schedule (MilliSeconds(0), &LogPosition, mobStream, scenario);
   Simulator::Run ();
 
-  FlowMonitorOutputStats flowMonStats;
+  //FlowMonitorOutputStats flowMonStats;
   //flowMonStats.SetDb (&db, tableName);
-  flowMonStats.Save (monitor, flowmonHelper, params.outputDir + "/" + params.simTag);
+  //flowMonStats.Save (monitor, flowmonHelper, params.outputDir + "/" + params.simTag);
 
   std::cout << "\n----------------------------------------\n"
             << "End simulation"
