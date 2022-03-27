@@ -53,52 +53,66 @@ struct Parameters
   friend
   std::ostream &
   operator << (std::ostream & os, const Parameters & parameters);
-
   bool Validate (void) const;
 
-  uint16_t numOuterRings = 3;
-  uint16_t ueNumPergNb = 2;
-  bool logging = true;
-  bool traces = true;
-  std::string simulator = "5GLENA";
+  // Deployment topology parameters
+  uint16_t numOuterRings = 1;
+  uint16_t ueNumPergNb = 30;
+  std::string simulator = "LENA";
   std::string scenario = "UMa";
-  std::string operationMode = "TDD";  // TDD or FDD
   std::string baseStationFile = ""; // path to file of tower/site coordinates
   bool useSiteFile = false; // whether to use baseStationFile parameter,
                             //or to use numOuterRings parameter to create a scenario
 
-  // Simulation parameters. Please don't use double to indicate seconds, use
-  // milliseconds and integers to avoid representation errors.
-  Time appGenerationTime = MilliSeconds (1000);
-  Time udpAppStartTime = MilliSeconds (400);
-  std::string direction = "DL";
-
-  // Spectrum parameters. We will take the input from the command line, and then
-  //  we will pass them inside the NR module.
-  uint16_t numerologyBwp = 0;
-  std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|"
-  uint32_t bandwidthMHz = 10;
-
-  // Where we will store the output files.
-  std::string simTag = "default";
-  std::string outputDir = "./";
-
-  // Error models
-  std::string errorModel = "";
-
-  bool calibration = false;
-  bool enableUlPc = false;
-  std::string powerAllocation = "UniformPowerAllocUsed";
-
-  uint32_t trafficScenario = 0;
-
-  std::string scheduler = "PF";
-  uint32_t freqScenario = 0;
-
-  double downtiltAngle = 0;
-
+  // Simulation parameters
+  // Don't use double for seconds, use  milliseconds and integers.
+  bool logging = true;
+  bool traces = true;
+  Time appGenerationTime = Seconds (1000);
+  Time appStartTime = MilliSeconds (500);
   Time progressInterval = Seconds (1);
   uint32_t randSeed = 13;
+
+  // RAN parameters
+  std::string operationMode = "FDD";  // TDD or FDD for NR. Only FDD available for LTE
+  uint16_t numerologyBwp = 0; // NR specific
+  // legend: F->flexible DL->downlink  UL->uplink S->special(LTE DL)
+  std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|" //NR specific
+  uint32_t bandwidthMHz = 10;
+  bool enableUlPc = false;
+  std::string scheduler = "PF";
+  uint32_t freqScenario = 0; // 0->non-overlaping 1->overlapping
+  double downtiltAngle = 0;
+
+  // mobility model 
+  double ueMinSpeed = 1.4; // m/s
+  double ueMaxSpeed = 10; // m/s
+
+  // traffic parameters
+
+  // DASH video streaming 
+  double targetDt = 20.0; // The target time difference between receiving and playing a frame. [s]. 
+  double window = 5.0; // The window for measuring the average throughput. [s].
+  uint32_t bufferSpace = 10000000; // 10 MB The space in bytes that is used for buffering the video
+  std::string abr = "ns3::FdashClient";
+  
+  // web browsing (http client)
+  uint32_t httpMainObjMean = 102400;
+  uint32_t httpMainObjStd = 40960;
+
+  // UDP flow
+  //uint32_t flowPacketSize = 1400;
+  uint32_t trafficScenario = 0; 
+  std::string direction = "both"; // "UL", "DL" or "both"
+
+  // UDP one way delay probes 
+  uint32_t delayPacketSize = 1400;
+  Time delayInterval = Seconds (0.1);
+
+  // UDP echo 
+  uint32_t echoPacketSize = 1400;
+  Time echoInterPacketInterval = Seconds (0.1);
+
 };
 
 extern void LenaLteComparison (const Parameters &params);

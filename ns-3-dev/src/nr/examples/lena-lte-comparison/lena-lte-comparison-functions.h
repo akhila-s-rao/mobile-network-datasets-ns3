@@ -650,7 +650,7 @@ operator << (std::ostream & os, const Parameters & parameters)
     {
       //MSG ("LTE Standard")
       //  << p.radioNetwork << (p.radioNetwork == "LTE" ? " (4G)" : " (5G NR)");
-      MSG ("4G-NR calibration mode") << (p.calibration ? "ON" : "off");
+      //MSG ("4G-NR calibration mode") << (p.calibration ? "ON" : "off");
       MSG ("4G-NR ULPC mode") << (p.enableUlPc ? "Enabled" : "Disabled");
       MSG ("Operation mode") << p.operationMode;
       if (p.operationMode == "TDD")
@@ -658,10 +658,10 @@ operator << (std::ostream & os, const Parameters & parameters)
           MSG ("Numerology") << p.numerologyBwp;
           MSG ("TDD pattern") << p.pattern;
         }
-      if (p.errorModel != "")
-        {
-          MSG ("Error model") << p.errorModel;
-        }
+      //if (p.errorModel != "")
+      //  {
+      //    MSG ("Error model") << p.errorModel;
+      //  }
       //else if (p.radioNetwork == "LTE")
       //  {
       //    MSG ("Error model") << "ns3::LenaErrorModel";
@@ -677,7 +677,7 @@ operator << (std::ostream & os, const Parameters & parameters)
       // LENA v1
       p.operationMode = "FDD";
       MSG ("LTE Standard") << "4G";
-      MSG ("Calibration mode") << (p.calibration ? "ON" : "off");
+      //MSG ("Calibration mode") << (p.calibration ? "ON" : "off");
       MSG ("LTE ULPC mode") << (p.enableUlPc ? "Enabled" : "Disabled");
       MSG ("Operation mode") << p.operationMode;
     }
@@ -804,13 +804,13 @@ operator << (std::ostream & os, const Parameters & parameters)
         os << "\n  (Unknown configuration)";
     }
 
-  MSG ("Application start window") << p.udpAppStartTime.As (Time::MS) << " + " << appStartWindow.As (Time::MS);
+  MSG ("Application start window") << p.appStartTime.As (Time::MS) << " + " << appStartWindow.As (Time::MS);
   MSG ("Application on duration") << p.appGenerationTime.As (Time::MS);
   MSG ("Traffic direction") << p.direction;
 
   MSG ("");
-  MSG ("Output file name") << p.simTag;
-  MSG ("Output directory") << p.outputDir;
+  //MSG ("Output file name") << p.simTag;
+  //MSG ("Output directory") << p.outputDir;
   MSG ("Logging") << (p.logging ? "ON" : "off");
   MSG ("Trace file generation") << (p.traces ? "ON" : "off");
   MSG ("");

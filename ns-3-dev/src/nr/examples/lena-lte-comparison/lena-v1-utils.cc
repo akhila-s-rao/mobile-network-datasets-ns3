@@ -160,13 +160,13 @@ LenaV1Utils::SetLenaV1SimulatorParameters (const double sector0AngleRad,
 
   // ALL SECTORS AND BANDS configuration
   Config::SetDefault ("ns3::FfMacScheduler::UlCqiFilter", EnumValue (FfMacScheduler::PUSCH_UL_CQI));
-  Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
+  //Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
   Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (100*1024)); //default is 10*1024 = 10KB 
   Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (txPower));
   Config::SetDefault ("ns3::LteUePhy::TxPower", DoubleValue (ueTxPower));
-  Config::SetDefault ("ns3::LteUePhy::NoiseFigure", DoubleValue (9.0));
-  Config::SetDefault ("ns3::LteUePhy::EnableRlfDetection", BooleanValue (false));
-  Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
+  //Config::SetDefault ("ns3::LteUePhy::NoiseFigure", DoubleValue (9.0));
+  //Config::SetDefault ("ns3::LteUePhy::EnableRlfDetection", BooleanValue (false));
+  //Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
   lteHelper->SetAttribute ("PathlossModel", StringValue (pathlossModel)); // for each band the same pathloss model
 
   // Disable shadowing in calibration, and enable it in non-calibration mode

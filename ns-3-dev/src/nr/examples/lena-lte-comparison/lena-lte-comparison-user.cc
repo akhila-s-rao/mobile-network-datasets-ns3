@@ -76,12 +76,12 @@ main (int argc, char *argv[])
   cmd.AddValue ("operationMode",
                 "The network operation mode can be TDD or FDD",
                 params.operationMode);
-  cmd.AddValue ("simTag",
-                "tag to be appended to output filenames to distinguish simulation campaigns",
-                params.simTag);
-  cmd.AddValue ("errorModelType",
-               "Error model type: ns3::NrEesmCcT1, ns3::NrEesmCcT2, ns3::NrEesmIrT1, ns3::NrEesmIrT2, ns3::NrLteMiErrorModel",
-               params.errorModel);
+//  cmd.AddValue ("simTag",
+//                "tag to be appended to output filenames to distinguish simulation campaigns",
+//                params.simTag);
+//  cmd.AddValue ("errorModelType",
+//               "Error model type: ns3::NrEesmCcT1, ns3::NrEesmCcT2, ns3::NrEesmIrT1, ns3::NrEesmIrT2, ns3::NrLteMiErrorModel",
+//               params.errorModel);
   cmd.AddValue ("trafficScenario",
                 "0: saturation (80 Mbps/20 MHz), 1: latency (1 pkt of 12 bytes), 2: low-load (1 Mbps), 3: medium-load (20Mbps)",
                 params.trafficScenario);
@@ -100,9 +100,9 @@ main (int argc, char *argv[])
   cmd.AddValue ("enableUlPc",
                 "Whether to enable or disable UL power control",
                 params.enableUlPc);
-  cmd.AddValue ("powerAllocation",
-                "Power allocation can be a)UniformPowerAllocBw or b)UniformPowerAllocUsed.",
-                params.powerAllocation);
+//  cmd.AddValue ("powerAllocation",
+//                "Power allocation can be a)UniformPowerAllocBw or b)UniformPowerAllocUsed.",
+//                params.powerAllocation);
   cmd.AddValue ("progressInterval",
                 "Progress reporting interval",
                 params.progressInterval);

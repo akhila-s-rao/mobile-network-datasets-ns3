@@ -61,8 +61,8 @@ bool Parameters::Validate (void) const{
                    "Traffic scenario " << trafficScenario << " not valid. Valid values are 0 1 2 3");
   NS_ABORT_MSG_IF (numerologyBwp > 4,
                    "At most 4 bandwidth parts supported.");
-  NS_ABORT_MSG_IF (direction != "DL" && direction != "UL",
-                   "Flow direction can only be DL or UL: " << direction);
+  NS_ABORT_MSG_IF (direction != "DL" && direction != "UL" && direction != "both",
+                   "Flow direction can only be DL, UL or both: " << direction);
   NS_ABORT_MSG_IF (operationMode != "TDD" && operationMode != "FDD",
                    "Operation mode can only be TDD or FDD: " << operationMode);
   //NS_ABORT_MSG_IF (radioNetwork != "LTE" && radioNetwork != "NR",
@@ -101,7 +101,8 @@ void LenaLteComparison (const Parameters &params){
  /***********************************************
  * Create Log files and write column names
  **********************************************/
-
+//if (params.traces == true)
+    
   AsciiTraceHelper traceHelper;
   Ptr<OutputStreamWrapper> mobStream = traceHelper.CreateFileStream ("mobility_trace.txt");
   *mobStream->GetStream() 
@@ -147,7 +148,7 @@ void LenaLteComparison (const Parameters &params){
   *rttStream->GetStream()
           << "tstamp_us\t" << "ueId\t" << "cellId\t"
           << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp\t" << "delay" << std::endl;
-
+    
 
 
   /*
@@ -158,9 +159,9 @@ void LenaLteComparison (const Parameters &params){
   //Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue ());
   Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (160));
   // Set time granularity for observations that are periodic
-  Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (100));//millisecond
-  Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (10));//millisecond
-  Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (100));//millisecond
+  Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (20));//millisecond
+  Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (20));//millisecond
+  Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (20));//millisecond
   
 
   //Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (75000000));
@@ -297,8 +298,6 @@ void LenaLteComparison (const Parameters &params){
             << "  Ywidth: " << (boundingBoxMaxY - boundingBoxMinY)
             << std::endl;
 
-  double ueMinSpeed = 1.4; // m/s // This should be in params
-  double ueMaxSpeed = 10; // m/s // This should be in params
   double ueZ =1.5; // THIS SHOULD NOT BE HARD CODED. CHANGE
 
   MobilityHelper mobility;
@@ -313,9 +312,9 @@ void LenaLteComparison (const Parameters &params){
                           DoubleValue (boundingBoxMaxY));
   Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::Z", DoubleValue (ueZ));
   Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxSpeed",
-                          DoubleValue (ueMaxSpeed));
+                          DoubleValue (params.ueMaxSpeed));
   Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinSpeed",
-                          DoubleValue (ueMinSpeed));
+                          DoubleValue (params.ueMinSpeed));
 
   Ptr<PositionAllocator> positionAlloc = CreateObject<RandomBoxPositionAllocator> ();
   Ptr<UniformRandomVariable> xPos = CreateObject<UniformRandomVariable> ();
@@ -378,9 +377,8 @@ void LenaLteComparison (const Parameters &params){
       epcHelper = CreateObject<NrPointToPointEpcHelper> ();
       LenaV2Utils::SetLenaV2SimulatorParameters (sector0AngleRad,
                                                  params.scenario,
-                                                 params.errorModel,
                                                  params.operationMode,
-                                                 params.direction,
+                                                 //params.direction,
                                                  params.numerologyBwp,
                                                  params.pattern,
                                                  gnbSector1Container,
@@ -398,14 +396,13 @@ void LenaLteComparison (const Parameters &params){
                                                  ueSector2NetDev,
                                                  ueSector3NetDev,
                                                  params.enableUlPc,
-                                                 params.powerAllocation,
+                                                 //params.powerAllocation,
                                                  params.scheduler,
                                                  params.bandwidthMHz,
                                                  params.freqScenario,
                                                  params.downtiltAngle);
     }
 
-  std::cout << "debug 1" << std::endl;
 
   // Check we got one valid helper
   if ( (lteHelper == nullptr) && (nrHelper == nullptr) )
@@ -498,30 +495,23 @@ void LenaLteComparison (const Parameters &params){
   uint16_t httpPortNum = 16000;
 
   // Configuration parameters for echo application
-  uint32_t echoPacketSize = 1024;
-  uint32_t echoPacketCount = 100000; // how to send packets until the end of the simulation ? 
-  Time echoInterPacketInterval = Seconds (0.1);
+  uint32_t echoPacketCount = 0xFFFFFFFF; 
 
   // Configuration parameters for UL and DL delay application 
-  uint32_t delayPacketSize = 1024;
-  uint32_t delayPacketCount = 100000; // how to send packets until the end of the simulation ? 
-  Time delayInterval = Seconds (0.1);
-
-  // Configuration parameters for DASH application
-  double targetDt = 35.0;  // The target time difference between receiving and playing a frame. [s].
-  double window = 10.0; // The window for measuring the average throughput. [s].
-  std::istringstream iss ("ns3::FdashClient");
-  uint32_t bufferSpace = 4000000; // 4 MB The space in bytes that is used for buffering the video
+  uint32_t delayPacketCount = 0xFFFFFFFF; 
 
   // Configuration parameters for UL and DL Traffic parameters for the Flows 
-  uint32_t flowPacketSize = 1000;
+  
+  uint32_t flowPacketSize = 1000; // this gets set based on trafficScenario and BW 
   uint32_t lambda;
   uint32_t flowPacketCount;
-
+  
   std::cout << "  traffic parameters\n";
   switch (params.trafficScenario)
     {
-      case 0: // let's put 80 Mbps with 20 MHz of bandwidth. Everything else is scaled
+      case 0: // ! let's put 80 Mbps with 20 MHz of bandwidth. Everything else is scaled
+	      // ! let's put 64 Mbps with 20 MHz of bandwidth. Everything else is scaled
+	      // let's put 48 Mbps with 20 MHz of bandwidth. Everything else is scaled
         flowPacketCount = 0xFFFFFFFF;
         switch (params.bandwidthMHz)
           {
@@ -537,7 +527,9 @@ void LenaLteComparison (const Parameters &params){
             default:
               flowPacketSize = 1000;
           }
-        lambda = 10000 / params.ueNumPergNb;
+        //lambda = 10000 / params.ueNumPergNb; // 80 Mbps with 20 MHz
+	//lambda = 8000 / params.ueNumPergNb; // 64 Mbps with 20 MHz
+	lambda = 6000 / params.ueNumPergNb; // 48 Mbps with 20 MHz
         break;
       case 1:
         flowPacketCount = 1;
@@ -609,11 +601,11 @@ void LenaLteComparison (const Parameters &params){
   PointerValue varPtr;
   httpSer->GetAttribute ("Variables", varPtr);
   Ptr<ThreeGppHttpVariables> httpVariables = varPtr.Get<ThreeGppHttpVariables> ();
-  httpVariables->SetMainObjectSizeMean (102400); // 100kB
-  httpVariables->SetMainObjectSizeStdDev (40960); // 40kB
+  httpVariables->SetMainObjectSizeMean (params.httpMainObjMean); // 100kB
+  httpVariables->SetMainObjectSizeStdDev (params.httpMainObjStd); // 40kB
 
   // start all servers
-  serverApps.Start (params.udpAppStartTime);
+  serverApps.Start (params.appStartTime);
   
   // Configure UL and DL flow client applications 
   Time flowInterval = Seconds (1.0 / lambda);
@@ -632,26 +624,26 @@ void LenaLteComparison (const Parameters &params){
   UdpClientHelper ulDelayClient;
   ulDelayClient.SetAttribute ("RemotePort", UintegerValue (ulDelayPortNum));
   ulDelayClient.SetAttribute ("MaxPackets", UintegerValue (delayPacketCount));
-  ulDelayClient.SetAttribute ("PacketSize", UintegerValue (delayPacketSize));
-  ulDelayClient.SetAttribute ("Interval", TimeValue (delayInterval));
+  ulDelayClient.SetAttribute ("PacketSize", UintegerValue (params.delayPacketSize));
+  ulDelayClient.SetAttribute ("Interval", TimeValue (params.delayInterval));
   UdpClientHelper dlDelayClient;
   dlDelayClient.SetAttribute ("RemotePort", UintegerValue (dlDelayPortNum));
   dlDelayClient.SetAttribute ("MaxPackets", UintegerValue (delayPacketCount));
-  dlDelayClient.SetAttribute ("PacketSize", UintegerValue (delayPacketSize));
-  dlDelayClient.SetAttribute ("Interval", TimeValue (delayInterval));
+  dlDelayClient.SetAttribute ("PacketSize", UintegerValue (params.delayPacketSize));
+  dlDelayClient.SetAttribute ("Interval", TimeValue (params.delayInterval));
 
   // Configure echo client application
   UdpEchoClientHelper echoClient (remoteHostAddr, echoPortNum);
   echoClient.SetAttribute ("MaxPackets", UintegerValue (echoPacketCount));
-  echoClient.SetAttribute ("Interval", TimeValue (echoInterPacketInterval));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (echoPacketSize));
+  echoClient.SetAttribute ("Interval", TimeValue (params.echoInterPacketInterval));
+  echoClient.SetAttribute ("PacketSize", UintegerValue (params.echoPacketSize));
 
   // Configure DASH client application 
-  DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum), "ns3::FdashClient");
+  DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum), params.abr);
   dashClient.SetAttribute ("VideoId", UintegerValue (1)); // VideoId should be positive
-  dashClient.SetAttribute ("TargetDt", TimeValue (Seconds (targetDt)));
-  dashClient.SetAttribute ("window", TimeValue (Seconds (window)));
-  dashClient.SetAttribute ("bufferSpace", UintegerValue (bufferSpace));
+  dashClient.SetAttribute ("TargetDt", TimeValue (Seconds (params.targetDt)));
+  dashClient.SetAttribute ("window", TimeValue (Seconds (params.window)));
+  dashClient.SetAttribute ("bufferSpace", UintegerValue (params.bufferSpace));
 
   // Configure http client application
   ThreeGppHttpClientHelper httpClient (remoteHostAddr);
@@ -693,20 +685,20 @@ void LenaLteComparison (const Parameters &params){
       auto appsClass1 = InstallUdpEchoApps (node, dev, addr,
                               &echoClient,
                               remoteHost, remoteHostAddr,
-                              params.udpAppStartTime, echoPortNum,
+                              params.appStartTime, echoPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
       clientApps.Add (appsClass1.first);
       auto appsClass2 = InstallUlDelayTrafficApps (node, dev, addr,
                               &ulDelayClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               ulDelayPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
       clientApps.Add (appsClass2.first);
       auto appsClass3 = InstallDlDelayTrafficApps (node, dev, addr,
                               &dlDelayClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               dlDelayPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
@@ -719,14 +711,14 @@ void LenaLteComparison (const Parameters &params){
       else if (ueId % 2 == 0) {// These UEs do video streaming + background CBR traffic + delay measurement 
 	      auto appsClass4 = InstallUlFlowTrafficApps (node, dev, addr,
                               &ulFlowClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               ulFlowPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
               clientApps.Add (appsClass4.first);
               auto appsClass5 = InstallDlFlowTrafficApps (node, dev, addr,
                               &dlFlowClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               dlFlowPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
@@ -734,7 +726,7 @@ void LenaLteComparison (const Parameters &params){
  	      auto appsClass6 = InstallDashApps (node, dev, addr,
                               &dashClient,
                               remoteHost, remoteHostAddr,
-                              params.udpAppStartTime, dashPortNum,
+                              params.appStartTime, dashPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
 	      clientApps.Add (appsClass6.first);
@@ -742,14 +734,14 @@ void LenaLteComparison (const Parameters &params){
       else {// These UEs do web browsing + background CBR traffic + delay measurement 
               auto appsClass4 = InstallUlFlowTrafficApps (node, dev, addr,
                               &ulFlowClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               ulFlowPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
               clientApps.Add (appsClass4.first);
               auto appsClass5 = InstallDlFlowTrafficApps (node, dev, addr,
                               &dlFlowClient,
-                              remoteHost, remoteHostAddr, params.udpAppStartTime,
+                              remoteHost, remoteHostAddr, params.appStartTime,
                               dlFlowPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
@@ -757,7 +749,7 @@ void LenaLteComparison (const Parameters &params){
               auto appsClass6 = InstallHttpApps (node, dev, addr,
                               &httpClient,
                               remoteHost, remoteHostAddr,
-                              params.udpAppStartTime, httpPortNum,
+                              params.appStartTime, httpPortNum,
                               startRng, params.appGenerationTime,
                               lteHelper, nrHelper);
 	      clientApps.Add (appsClass6.first);
@@ -769,7 +761,6 @@ void LenaLteComparison (const Parameters &params){
   std::cout << clientApps.GetN () << " apps\n";
 
   // enable the RAN traces provided by the lte/nr module
-  std::cout << "  tracing\n";
   if (params.traces == true)
     {
       if (lteHelper != nullptr)
@@ -778,11 +769,13 @@ void LenaLteComparison (const Parameters &params){
         }
       else if (nrHelper != nullptr)
         {
-          //nrHelper->EnableTraces ();
+          nrHelper->EnableTraces ();
         }
     }
 
-#if false
+  // enable packet tracing from the application layer 
+  if (params.traces == true)
+    {
   Config::Connect ("/NodeList/*/ApplicationList/0/$ns3::UdpServer/RxWithAddresses", MakeBoundCallback (&delayTrace, delayStream, scenario, remoteHost));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::DashClient/RxSegment", MakeBoundCallback (&dashClientTrace, dashClientStream, scenario));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::DashClient/PlayedFrame", MakeBoundCallback (&mpegPlayerTrace, mpegPlayerStream, scenario));
@@ -791,21 +784,8 @@ void LenaLteComparison (const Parameters &params){
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ThreeGppHttpServer/RxDelay", MakeBoundCallback (&httpServerTraceRxDelay, httpServerDelayStream, scenario));
   Config::Connect ("/NodeList/*/ApplicationList/1/$ns3::UdpServer/RxWithAddresses", MakeBoundCallback (&flowTrace, flowStream, scenario, remoteHost));
   Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::UdpEchoClient/RxWithAddresses", MakeBoundCallback (&rttTrace, rttStream, scenario));
-#endif
+    }
 
-  /*
-  // FlowMonitor for aggregated logs
-  std::cout << "  flowmon\n";
-  FlowMonitorHelper flowmonHelper;
-  NodeContainer endpointNodes;
-  endpointNodes.Add (remoteHost);
-  endpointNodes.Add (ueNodes);
-  Ptr<FlowMonitor> monitor = flowmonHelper.Install (endpointNodes);
-  monitor->SetAttribute ("DelayBinWidth", DoubleValue (0.001));
-  monitor->SetAttribute ("JitterBinWidth", DoubleValue (0.001));
-  monitor->SetAttribute ("PacketSizeBinWidth", DoubleValue (20));
-  std::string tableName = "e2e";
-*/
   std::cout << "\n----------------------------------------\n"
             << "Start simulation"
             << std::endl;
@@ -818,9 +798,6 @@ void LenaLteComparison (const Parameters &params){
   Simulator::Schedule (MilliSeconds(0), &LogPosition, mobStream, scenario);
   Simulator::Run ();
 
-  //FlowMonitorOutputStats flowMonStats;
-  //flowMonStats.SetDb (&db, tableName);
-  //flowMonStats.Save (monitor, flowmonHelper, params.outputDir + "/" + params.simTag);
 
   std::cout << "\n----------------------------------------\n"
             << "End simulation"

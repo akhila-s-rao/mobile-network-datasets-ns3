@@ -114,9 +114,8 @@ void ConfigurePhy (Ptr<NrHelper> &nrHelper,
 void
 LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
                                            const std::string &scenario,
-                                           std::string errorModel,
                                            const std::string &operationMode,
-                                           const std::string &direction,
+                                           //const std::string &direction,
                                            uint16_t numerology,
                                            const std::string &pattern,
                                            const NodeContainer &gnbSector1Container,
@@ -134,7 +133,7 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
                                            NetDeviceContainer &ueSector2NetDev,
                                            NetDeviceContainer &ueSector3NetDev,
                                            bool enableUlPc,
-                                           std::string powerAllocation,
+                                           //std::string powerAllocation,
                                            //SinrOutputStats *sinrStats,
                                            //PowerOutputStats *ueTxPowerStats,
                                            //PowerOutputStats *gnbRxPowerStats,
@@ -196,6 +195,7 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
 
   nrHelper->SetPathlossAttribute ("ShadowingEnabled", BooleanValue (true));
 
+  nrHelper->SetUePhyAttribute ("EnableUplinkPowerControl", BooleanValue (enableUlPc));
   /*
    * Create the necessary operation bands.
    *
@@ -493,18 +493,36 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
   nrHelper->SetUePhyAttribute ("TxPower", DoubleValue (23.0));
 
   // We assume a common traffic pattern for all UEs
-  uint32_t bwpIdForLowLat = 0;
-  if (operationMode == "FDD" && direction == "UL")
+  uint32_t bwpIdForLowLat;
+/*  if (operationMode == "FDD" && direction == "UL")
     {
       bwpIdForLowLat = 1;
+    }*/
+
+  // unsure if this code works as I think it does. Havent checked it since I have not tried FDD in 5G 
+  if (operationMode == "FDD")
+    {
+      bwpIdForLowLat = 0;
+      // gNb routing between Bearer and bandwidth part
+      nrHelper->SetGnbBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
+
+      // Ue routing between Bearer and bandwidth part
+      nrHelper->SetUeBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
+       bwpIdForLowLat = 1;
+      // gNb routing between Bearer and bandwidth part
+      nrHelper->SetGnbBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
+
+      // Ue routing between Bearer and bandwidth part
+      nrHelper->SetUeBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));    
     }
+  else { // TDD
+      bwpIdForLowLat = 0;
+      // gNb routing between Bearer and bandwidth part
+      nrHelper->SetGnbBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
 
-  // gNb routing between Bearer and bandwidth part
-  nrHelper->SetGnbBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
-
-  // Ue routing between Bearer and bandwidth part
-  nrHelper->SetUeBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
-
+      // Ue routing between Bearer and bandwidth part
+      nrHelper->SetUeBwpManagerAlgorithmAttribute ("NGBR_VIDEO_TCP_DEFAULT", UintegerValue (bwpIdForLowLat));
+   }
   /*
    * We miss many other parameters. By default, not configuring them is equivalent
    * to use the default values. Please, have a look at the documentation to see
@@ -603,13 +621,13 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
   // When all the configuration is done, explicitly call UpdateConfig ()
   for (auto nd = gnbNetDevs.Begin (); nd != gnbNetDevs.End (); ++nd)
     {
-      uint32_t bwpId = 0;
+      /*uint32_t bwpId = 0;
       if (operationMode == "FDD" && direction == "UL")
         {
           bwpId = 1;
         }
       auto gnbPhy = nrHelper->GetGnbPhy (*nd, bwpId);
-      /*gnbPhy->TraceConnectWithoutContext ("SlotDataStats",
+      gnbPhy->TraceConnectWithoutContext ("SlotDataStats",
                                           MakeBoundCallback (&ReportSlotStatsNr, slotStats));
       gnbPhy->TraceConnectWithoutContext ("RBDataStats",
                                           MakeBoundCallback (&ReportRbStatsNr, rbStats));

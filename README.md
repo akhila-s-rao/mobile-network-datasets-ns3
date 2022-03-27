@@ -5,7 +5,7 @@ This project contains scripts to generate datasets from 4G and 5G mobile network
 This is a full ns-3 installation along with the additional modules and changes to the base code. 
 
 ## Step 1: Clone the repository 
-git clone git@github.com:akhila-s-rao/mobile-network-datasets-ns3.git
+git clone https://github.com/akhila-s-rao/mobile-network-datasets-ns3.git
 
 ## Step 2: Go into the ns-3 code folder 
 cd mobile-network-datasets-ns3/ns-3-dev 
