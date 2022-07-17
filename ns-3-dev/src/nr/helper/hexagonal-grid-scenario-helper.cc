@@ -74,7 +74,8 @@ PlotHexagonalDeployment (const Ptr<const ListPositionAllocator> &sitePosVector,
   topologyOutfile << "set term pdf" << std::endl;
   topologyOutfile << "set output \"" << topologyFileRoot << ".pdf\"" << std::endl;
   topologyOutfile << "set style arrow 1 lc \"black\" lt 1 head filled" << std::endl;
-//  topologyOutfile << "set autoscale" << std::endl;
+  //topologyOutfile << "set autoscale" << std::endl;
+  topologyOutfile << "set size square" << std::endl;
 
   uint16_t margin = (8 * cellRadius) + 1;  //!< This is the farthest hexagonal vertex from the cell center
   topologyOutfile << "set xrange [-" << margin << ":" << margin <<"]" << std::endl;
@@ -125,13 +126,13 @@ PlotHexagonalDeployment (const Ptr<const ListPositionAllocator> &sitePosVector,
 
     }
 
-  for (uint16_t utId = 0; utId < numUts; ++utId)
+/*  for (uint16_t utId = 0; utId < numUts; ++utId)
     {
       Vector utPos = utPosVector->GetNext ();
 //      set label at xPos, yPos, zPos "" point pointtype 7 pointsize 2
       topologyOutfile << "set label at " << utPos.x << " , " << utPos.y <<
           " point pointtype 7 pointsize 0.2 center" << std::endl;
-    }
+    }*/
 
    topologyOutfile << "unset key" << std::endl; //!< Disable plot legends
    topologyOutfile << "plot 1/0" << std::endl;  //!< Need to plot a function

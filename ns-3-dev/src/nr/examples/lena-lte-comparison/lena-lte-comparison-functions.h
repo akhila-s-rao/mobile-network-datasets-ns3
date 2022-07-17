@@ -353,7 +353,6 @@ void rttTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterfac
          << "\t" << packet_copy->GetSize () // received size
          << "\t" << seqTs.GetSeq () //current sequence number
          << "\t" << packet_copy->GetUid ()
-         << "\t" << (seqTs.GetTs ()).GetMicroSeconds () // rtt
          << "\t" << (seqTs.GetTs ()).GetMicroSeconds () // tx TimeStamp
          << "\t" << (Simulator::Now () - seqTs.GetTs ()).GetMicroSeconds () // rtt
          << std::endl;
@@ -495,6 +494,7 @@ InstallDashApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
   Time startTime = MilliSeconds (start);
   app.Start (startTime);
   app.Stop (startTime + appGenerationTime);
+  //std::cout << "This app will start at " << startTime.GetSeconds () << " and stop after " << appGenerationTime.GetSeconds () << "\n" ;  
 
   return std::make_pair (app, startTime);
 }

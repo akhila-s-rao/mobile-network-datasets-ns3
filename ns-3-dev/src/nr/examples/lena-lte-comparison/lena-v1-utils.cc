@@ -168,6 +168,20 @@ LenaV1Utils::SetLenaV1SimulatorParameters (const double sector0AngleRad,
   //Config::SetDefault ("ns3::LteUePhy::EnableRlfDetection", BooleanValue (false));
   //Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
   lteHelper->SetAttribute ("PathlossModel", StringValue (pathlossModel)); // for each band the same pathloss model
+  // Setup A2A4Rsrq handover algorithm 
+  lteHelper->SetHandoverAlgorithmType ("ns3::A2A4RsrqHandoverAlgorithm");
+  lteHelper->SetHandoverAlgorithmAttribute ("ServingCellThreshold",
+                                            UintegerValue (30));
+  lteHelper->SetHandoverAlgorithmAttribute ("NeighbourCellOffset",
+                                            UintegerValue (1));
+  
+  // Setup A3Rsrp handover algorithm
+  //lteHelper->SetHandoverAlgorithmType ("ns3::A3RsrpHandoverAlgorithm");
+  //lteHelper->SetHandoverAlgorithmAttribute ("Hysteresis",
+  //                                        DoubleValue (3.0));
+  //lteHelper->SetHandoverAlgorithmAttribute ("TimeToTrigger",
+  //                                        TimeValue (MilliSeconds (256)));
+
 
   // Disable shadowing in calibration, and enable it in non-calibration mode
   lteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
