@@ -51,6 +51,15 @@ main (int argc, char *argv[])
   cmd.AddValue ("numRings",
                 "The number of rings around the central site",
                 params.numOuterRings);
+  cmd.AddValue ("useMicroLayer",
+                "If true, a micro cell layer of base stations will be created over the macro cell layer",
+                params.useMicroLayer);
+  cmd.AddValue ("numMicroCells",
+                "Number of micro cells that should be random dropped into the deployment",
+                params.numMicroCells);  
+  cmd.AddValue ("microCellTxPower",
+                "Transmit power of the base stations in the micro cell layer",
+                params.microCellTxPower); 
   cmd.AddValue ("ueNumPergNb",
                 "The number of UE per cell or gNB in multiple-ue topology",
                 params.ueNumPergNb);
@@ -64,27 +73,15 @@ main (int argc, char *argv[])
   cmd.AddValue ("appGenerationTime",
                 "Duration applications will generate traffic.",
                 params.appGenerationTime);
-  cmd.AddValue ("numerologyBwp",
-                "The numerology to be used (NR only)",
-                params.numerologyBwp);
-  cmd.AddValue ("pattern",
-                "The TDD pattern to use",
-                params.pattern);
   cmd.AddValue ("simulator",
                 "The cellular network simulator to use: LENA or 5GLENA",
                 params.simulator);
   cmd.AddValue ("operationMode",
                 "The network operation mode can be TDD or FDD",
                 params.operationMode);
-//  cmd.AddValue ("simTag",
-//                "tag to be appended to output filenames to distinguish simulation campaigns",
-//                params.simTag);
-//  cmd.AddValue ("errorModelType",
-//               "Error model type: ns3::NrEesmCcT1, ns3::NrEesmCcT2, ns3::NrEesmIrT1, ns3::NrEesmIrT2, ns3::NrLteMiErrorModel",
-//               params.errorModel);
-  cmd.AddValue ("trafficScenario",
-                "0: saturation (80 Mbps/20 MHz), 1: latency (1 pkt of 12 bytes), 2: low-load (1 Mbps), 3: medium-load (20Mbps)",
-                params.trafficScenario);
+  cmd.AddValue ("trafficLoadFrac",
+                "The fraction of base station bandwidth to load with UDP flow traffic",
+                params.trafficLoadFrac);
   cmd.AddValue ("scheduler",
                 "PF: Proportional Fair, RR: Round-Robin",
                 params.scheduler);
@@ -94,15 +91,9 @@ main (int argc, char *argv[])
   cmd.AddValue ("freqScenario",
                 "0: NON_OVERLAPPING (each sector in different freq), 1: OVERLAPPING (same freq for all sectors)",
                 params.freqScenario);
-  cmd.AddValue ("downtiltAngle",
-                "Base station antenna down tilt angle (deg)",
-                params.downtiltAngle);
   cmd.AddValue ("enableUlPc",
                 "Whether to enable or disable UL power control",
                 params.enableUlPc);
-//  cmd.AddValue ("powerAllocation",
-//                "Power allocation can be a)UniformPowerAllocBw or b)UniformPowerAllocUsed.",
-//                params.powerAllocation);
   cmd.AddValue ("progressInterval",
                 "Progress reporting interval",
                 params.progressInterval);

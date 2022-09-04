@@ -34,18 +34,14 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-//#include <ns3/sqlite-output.h>
-//#include "flow-monitor-output-stats.h"
 #include "lena-v1-utils.h"
 #include "lena-v2-utils.h"
 #include <iomanip>
 #include "ns3/log.h"
 
-
 #include "lena-lte-comparison.h"
 
-
-#ifndef LENA_LTE_COMPARISON__FUNCTION_H
+#ifndef LENA_LTE_COMPARISON_FUNCTION_H
 #define LENA_LTE_COMPARISON_FUNCTION_H
 
 namespace ns3 {
@@ -54,18 +50,34 @@ namespace ns3 {
  * Global declarations
  ***************************/
 
-const Time appStartWindow = MilliSeconds (50);
-uint16_t NUM_GNBS = 0; // needs to be set in code 
+const Time appStartWindow = MilliSeconds (500); // 50
+//uint16_t NUM_GNBS = 0; // needs to be set in code 
 
-NodeContainer gnbNodes;
+NodeContainer macroLayerGnbNodes;
+NodeContainer microLayerGnbNodes;
+NodeContainer allGnbNodes;
 NodeContainer ueNodes;
 Ipv4InterfaceContainer ueIpIfaces;
 
+Parameters global_params;
+    
+AsciiTraceHelper traceHelper;
+Ptr<OutputStreamWrapper> mobStream;
+Ptr<OutputStreamWrapper> delayStream;
+Ptr<OutputStreamWrapper> dashClientStream;
+Ptr<OutputStreamWrapper> mpegPlayerStream; 
+Ptr<OutputStreamWrapper> httpClientDelayStream;
+Ptr<OutputStreamWrapper> httpClientRttStream;
+Ptr<OutputStreamWrapper> httpServerDelayStream;
+Ptr<OutputStreamWrapper> flowStream;
+Ptr<OutputStreamWrapper> rttStream;
+Ptr<OutputStreamWrapper> topologyStream;         
+    
 /***************************
  * Structure Definitions
  ***************************/
 
-struct CallbackStruct
+/*struct CallbackStruct
 {
     Ptr<OutputStreamWrapper> stream;
     NodeDistributionScenarioInterface* scenario;
@@ -80,123 +92,127 @@ struct CallbackStruct
     {
         return (!(stream == a.stream && scenario == a.scenario));
     }
-};
+};*/
 
 /***************************
  * Function Declarations
  ***************************/
 
 uint16_t GetUeIdFromNodeId (uint16_t nodeId);
-uint16_t GetImsiFromUeId (uint16_t ueId);
 uint16_t GetNodeIdFromContext (std::string context);
 uint16_t GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes, const Ipv4InterfaceContainer* ueIpIfaces);
-void LogPosition (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario);
-void delayTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+//uint16_t GetCellId_from_cellIndex (uint16_t index, uint16_t num_sites, uint16_t num_sectors);
+uint16_t GetCellId_from_cellIndex (uint16_t index);
+Ptr<LteEnbNetDevice> GetServingEnbDev_from_ueId (uint16_t ueId);
+bool isFromMicroLayer (uint16_t cellId);
+bool isFromMacroLayer (uint16_t cellId);    
+uint16_t GetImsi_from_ueId(uint16_t ueId);
+uint16_t GetCellId_from_ueId(uint16_t ueId);
+void ScenarioInfo (NodeDistributionScenarioInterface* scenario);
+//bool Parameters::Validate (void) const;
+void NotifyConnectionEstablishedUe (std::string context, uint64_t imsi,
+                               uint16_t cellid, uint16_t rnti);
+void NotifyConnectionEstablishedEnb (std::string context, uint64_t imsi,
+                                uint16_t cellid, uint16_t rnti);
+void NotifyHandoverStartUe (std::string context, uint64_t imsi,
+                       uint16_t cellid, uint16_t rnti, uint16_t targetCellId);
+void NotifyHandoverEndOkUe (std::string context, uint64_t imsi,
+                       uint16_t cellid, uint16_t rnti);   
+void NotifyHandoverStartEnb (std::string context, uint64_t imsi,
+                        uint16_t cellid, uint16_t rnti, uint16_t targetCellId);
+void NotifyHandoverEndOkEnb (std::string context, uint64_t imsi,
+                        uint16_t cellid, uint16_t rnti);
+void CheckForManualHandovers (Ptr<LteHelper> &lteHelper);
+void LogPosition (Ptr<OutputStreamWrapper> stream);
+void udpServerTrace(std::pair<uint16_t, uint16_t> DelayPortNums,
+               std::pair<uint16_t, uint16_t> FlowPortNums,
+                const Ptr<Node> &remoteHost,
+                std::string context,
+                Ptr<const Packet> packet, 
+               const Address &from, const Address &localAddress);
+void delayTrace (Ptr<OutputStreamWrapper> stream,
                 const Ptr<Node> &remoteHost,
                 std::string context,
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress);
 void dashClientTrace (
-                Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+                Ptr<OutputStreamWrapper> stream,
                 std::string context, 
 		ClientDashSegmentInfo & info);
 void mpegPlayerTrace (
-                Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+                Ptr<OutputStreamWrapper> stream,
                 std::string context,
                 MpegPlayerFrameInfo & mpegInfo);
-void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream, 
-		NodeDistributionScenarioInterface* scenario,
+void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
                 std::string context, 
 		const Time & delay, const Address & from, const uint32_t & size);
-void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream, 
-                NodeDistributionScenarioInterface* scenario,
+void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream,
                 std::string context,
 		const Time & rtt, const Address & from, const uint32_t & size);
-void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,  
-                NodeDistributionScenarioInterface* scenario,
+void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
                 std::string context,
 		const Time & delay, const Address & from);
-void flowTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+void flowTrace (Ptr<OutputStreamWrapper> stream,
                 const Ptr<Node> &remoteHost,
                 std::string context,
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress);
-void rttTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+void rttTrace (Ptr<OutputStreamWrapper> stream,
                 std::string context, 
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress);
 std::pair<ApplicationContainer, Time> 
-InstallDashApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             DashClientHelper *dashClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+InstallDashApps (const Ptr<Node> &ue,
+             DashClientHelper *dashClient, Time appStartTime, 
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallHttpApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             ThreeGppHttpClientHelper *httpClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+InstallHttpApps (const Ptr<Node> &ue,
+             ThreeGppHttpClientHelper *httpClient, Time appStartTime,
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallUdpEchoApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             UdpEchoClientHelper *echoClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+InstallUdpEchoApps (const Ptr<Node> &ue,
+             UdpEchoClientHelper *echoClient, Time appStartTime,
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallUlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
+InstallUlFlowTrafficApps (const Ptr<Node> &ue,
              const Address &ueAddress,
              UdpClientHelper *ulFlowClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t ulFlowPortNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallDlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
+InstallDlFlowTrafficApps (const Ptr<Node> &ue,
              const Address &ueAddress,
              UdpClientHelper *dlFlowClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t dlFlowPortNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallUlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
+InstallUlDelayTrafficApps (const Ptr<Node> &ue,
              UdpClientHelper *ulDelayClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t ulDelayPortNum,
              const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
+             Time appGenerationTime);
 std::pair<ApplicationContainer, Time> 
-InstallDlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
+InstallDlDelayTrafficApps (const Ptr<Node> &ue,
              const Address &ueAddress,
              UdpClientHelper *dlDelayClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t dlDelayPortNum,
              const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper);
-
+             Time appGenerationTime);
+void CreateTraceFiles (void);
+    
 /***************************
  * Function Definitions
  ***************************/
 
 uint16_t
 GetUeIdFromNodeId (uint16_t nodeId){
-  return(nodeId - NUM_GNBS);
-}
-
-uint16_t
-GetImsiFromUeId (uint16_t ueId){
-  return(ueId + 1);
+  return(nodeId - macroLayerGnbNodes.GetN());
 }
 
 uint16_t
@@ -212,10 +228,15 @@ GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes,
                 const Ipv4InterfaceContainer* ueIpIfaces
                 ) {
   bool knownSender = false;
+  // From the Ip addr get NetDevice and then Node
+  // There is probably a way to do this through indexing 
+  // but I am looping through the entire UE list to get the right node 
   for (uint32_t ueId = 0; ueId < ueNodes->GetN (); ++ueId){
     Ptr<Node> ue_node = ueNodes->Get (ueId);
-    Ipv4Address ue_addr = ueIpIfaces->GetAddress (ueId);
-
+    Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+    Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+    Ipv4Address ue_addr = iaddr.GetLocal ();
+    
     if (ue_addr == InetSocketAddress::ConvertFrom (ip_addr).GetIpv4 ()) {
       knownSender = true;
       return (ueId);
@@ -225,32 +246,338 @@ GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes,
   return(666); // the number of the beast
 }
 
+bool 
+isFromMicroLayer (uint16_t cellId)
+{
+    for(uint16_t index = 0; index < microLayerGnbNodes.GetN() ; ++index)
+    {
+        if ( cellId == ( microLayerGnbNodes.Get (index)->GetDevice (0)->GetObject<LteEnbNetDevice> ()->GetCellId() ) )
+            return (true);
+    }
+    return (false);  
+}
+    
+    
+bool 
+isFromMacroLayer (uint16_t cellId)
+{
+    for(uint16_t index = 0; index < macroLayerGnbNodes.GetN() ; ++index)
+    {
+        if ( cellId == ( macroLayerGnbNodes.Get (index)->GetDevice (0)->GetObject<LteEnbNetDevice> ()->GetCellId() ) )
+            return (true);
+    }
+    return (false);
+}
 
+/*uint16_t 
+GetCellId_from_cellIndex (uint16_t index, uint16_t num_sites, uint16_t num_sectors) {
+    return ( (num_sites * (index % num_sectors)) + (index / num_sectors) + 1) ; 
+}*/
+
+uint16_t
+GetCellId_from_cellIndex (uint16_t index)
+{
+    return( allGnbNodes.Get (index)->GetDevice (0)->GetObject<LteEnbNetDevice> ()->GetCellId() );
+}
+
+uint16_t 
+GetImsi_from_ueId(uint16_t ueId){
+  uint16_t imsi=0;
+  Ptr<Node> ue_node = ueNodes.Get (ueId);
+  if (global_params.simulator == "5GLENA"){
+    imsi = ue_node->GetDevice (0)->GetObject<NrUeNetDevice>()->GetImsi ();
+  }
+  else if (global_params.simulator == "LENA"){
+    imsi = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ()->GetImsi ();
+  }
+  return(imsi);
+}
+
+uint16_t
+GetCellId_from_ueId(uint16_t ueId){
+  uint16_t cellId=0;
+  Ptr<Node> ue_node = ueNodes.Get (ueId);
+  if (global_params.simulator == "5GLENA"){
+    cellId = ue_node->GetDevice (0)->GetObject<NrUeNetDevice>()->GetRrc ()->GetCellId ();
+  }
+  else if (global_params.simulator == "LENA"){
+    cellId = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ()->GetRrc ()->GetCellId ();
+  }
+  return(cellId);
+}
+
+
+Ptr<LteEnbNetDevice> 
+GetServingEnbDev_from_ueId (uint16_t ueId)
+{
+    uint16_t cellId = GetCellId_from_ueId (ueId);
+    // Iterate through the cells and find the right NetDev
+    for (uint16_t cellIndex = 0; cellIndex < allGnbNodes.GetN (); ++cellIndex)
+    {
+        Ptr<LteEnbNetDevice> enbDev = allGnbNodes.Get(cellIndex)->GetDevice (0)->GetObject<LteEnbNetDevice> ();
+        if ( enbDev->GetCellId () ==  cellId ) 
+        {
+            return (enbDev);
+        }
+    }
+    NS_ABORT_MSG ("Could not find serving cell for UE with IMSI: "<< GetImsi_from_ueId (ueId));
+}
+    
+void
+ScenarioInfo (NodeDistributionScenarioInterface* scenario)
+{
+  // Iterate through the ue container and print info 
+  std::cout << "================ BS Info =================" << std::endl;
+  std::cout << "Base station locations: " << std::endl;
+  *topologyStream->GetStream()
+          << "cellId," << "gnbpos_x," << "gnbpos_y," << "gnbpos_z" << std::endl;   
+  
+    for (uint32_t cellIndex = 0; cellIndex < allGnbNodes.GetN (); ++cellIndex)
+    {
+      Ptr<Node> gnb = allGnbNodes.Get (cellIndex);
+      uint32_t cellId = 0; 
+      Vector gnbpos = gnb->GetObject<MobilityModel> ()->GetPosition ();
+      if (global_params.simulator == "5GLENA"){
+          cellId = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetCellId ();
+      }
+      else if (global_params.simulator == "LENA"){
+          cellId = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetCellId ();
+      }
+      std::cout << "gnbNodes Index:" << cellIndex << " CellId: " << cellId << " pos: (" << gnbpos.x << ", " << gnbpos.y <<  ", " << gnbpos.z <<  ")  "
+              << std::endl;
+     *topologyStream->GetStream()
+          << cellId << "," << gnbpos.x << "," << gnbpos.y <<  "," << gnbpos.z << std::endl; 
+    }
+     
+  // Iterate through the ue container and print info 
+  std::cout << "================ UE Info =================" << std::endl;
+  for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId){
+     
+      if (global_params.simulator == "5GLENA"){
+          Ptr<Node> ue_node = ueNodes.Get (ueId);
+          Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
+          Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
+          Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+          Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+          Ipv4Address addr = iaddr.GetLocal ();
+          
+          // couldn't get mobility model object from netDev, 
+          // I need to get it form the node object
+          // Need to write code to get node from netdev ?? How ?  
+          //Vector gnbpos = uedev->GetTargetEnb ()->GetNode() ->GetObject<MobilityModel> ()->GetPosition ();
+          //double distance = CalculateDistance (gnbpos, uepos);
+        
+          std::cout << "NodeId "<< ue_node->GetId () 
+              << "   UeIndex (ueId)" << ueId
+              << "   IMSI " << uedev->GetImsi ()
+              << "   cellId " << GetCellId_from_ueId (ueId)
+              << "   UeIpAddr " << addr 
+              << "   UePos " << uepos
+              //<< "   distance to gnb " << distance << " meters"
+              << std::endl;
+      }
+      else if (global_params.simulator == "LENA"){
+          Ptr<Node> ue_node = ueNodes.Get (ueId);
+          Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
+          Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
+          Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+          Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+          Ipv4Address addr = iaddr.GetLocal ();
+          //Vector gnbpos = uedev->GetTargetEnb ()->GetNode()  >GetObject<MobilityModel> ()->GetPosition ();
+          //double distance = CalculateDistance (gnbpos, uepos);
+          std::cout << "NodeId "<< ue_node->GetId () 
+              << "   UeIndex (ueId)" << ueId
+              << "   IMSI " << uedev->GetImsi () 
+              << "   cellId " << GetCellId_from_ueId (ueId)
+              << "   UeIpAddr " << addr 
+              << "   UePos " << uepos
+              //<< "   distance to gnb " << distance << " meters"
+              << std::endl;
+      }
+  }
+
+}
+    
+    
+/*********************************
+ * Distance based manual handover 
+ *********************************/
+void CheckForManualHandovers (Ptr<LteHelper> &lteHelper)
+{
+    NS_ASSERT (lteHelper != nullptr);
+    // Iterate over UEs and check if there is a nearer cell to connect to 
+    for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId) 
+    {
+        Ptr<Node> ue_node = ueNodes.Get (ueId);
+        Ptr<MobilityModel> ue_mob_model = ue_node->GetObject<MobilityModel>();
+        Ptr<Node> attachedGnb_node = GetServingEnbDev_from_ueId (ueId)->GetNode();
+        Ptr<MobilityModel> attachedGnb_mob_model = attachedGnb_node->GetObject<MobilityModel>();
+        // distance to current cell
+        double current_dist = attachedGnb_mob_model->GetDistanceFrom (ue_mob_model);
+        
+        uint32_t attached_cellId = GetCellId_from_ueId(ueId);
+        uint16_t target_cellId = attached_cellId;
+        uint16_t target_cellIndex=666;
+        
+        for (uint16_t cellIndex = 0; cellIndex < allGnbNodes.GetN (); ++cellIndex)
+        {
+            Ptr<Node> gnb_node = allGnbNodes.Get (cellIndex);
+            Ptr<MobilityModel> gnb_mob_model = gnb_node->GetObject<MobilityModel>();
+            double dist = gnb_mob_model->GetDistanceFrom (ue_mob_model);
+            
+            if (dist < current_dist)
+            {
+                current_dist = dist;
+                target_cellId = GetCellId_from_cellIndex (cellIndex);
+                target_cellIndex = cellIndex;
+            }
+        }     
+        
+        // If the target or current cell are from the micro layer, and target is closer to UE than attached         
+        if ( ( target_cellId != attached_cellId) && (isFromMicroLayer(target_cellId) || isFromMicroLayer(attached_cellId) ) )
+        {
+            lteHelper->HandoverRequest (MilliSeconds (0), 
+                                        ue_node->GetDevice (0), 
+                                        attachedGnb_node->GetDevice(0),
+                                        allGnbNodes.Get (target_cellIndex)->GetDevice (0));
+                    
+            std::cout << " Manual handover done for UE IMSI: " << GetImsi_from_ueId(ueId) 
+                      << " from CellId: " << attached_cellId
+                      << " to CellId: " << target_cellId << " which is at dist: " << current_dist
+                      << std::endl;
+        }     
+    }
+    Simulator::Schedule (MilliSeconds(global_params.manualHoTriggerTime), &CheckForManualHandovers, lteHelper);
+}
+    
+    
+/**********************************
+ * Connection and Handover Events 
+ **********************************/
+    
+void
+NotifyConnectionEstablishedUe (std::string context, uint64_t imsi,
+                               uint16_t cellid, uint16_t rnti)
+{
+  std::cout << "ConnectionEstablished at "
+            << " UE IMSI " << imsi
+            << ": connected to CellId " << cellid
+            << " with RNTI " << rnti
+            << std::endl;
+}
+
+void
+NotifyConnectionEstablishedEnb (std::string context, uint64_t imsi,
+                                uint16_t cellid, uint16_t rnti)
+{
+  std::cout << "ConnectionEstablished at "
+            << " eNB CellId " << cellid
+            << ": successful connection of UE with IMSI " << imsi
+            << " RNTI " << rnti
+            << std::endl;
+}
+ 
+void
+NotifyHandoverStartUe (std::string context, uint64_t imsi,
+                       uint16_t cellid, uint16_t rnti, uint16_t targetCellId)
+{
+  std::cout << "HandoverStart "
+            << " UE IMSI " << imsi
+            << ": previously connected to CellId " << cellid
+            << " with RNTI " << rnti
+            << ", doing handover to CellId " << targetCellId
+            << std::endl;
+}
+
+void
+NotifyHandoverEndOkUe (std::string context, uint64_t imsi,
+                       uint16_t cellid, uint16_t rnti)
+{
+  std::cout << "HandoverEnd "
+            << " UE IMSI " << imsi
+            << ": successful handover to CellId " << cellid
+            << " with RNTI " << rnti
+            << std::endl;
+}    
+        
+void
+NotifyHandoverStartEnb (std::string context, uint64_t imsi,
+                        uint16_t cellid, uint16_t rnti, uint16_t targetCellId)
+{
+  std::cout << "HandoverStart "
+            << " eNB CellId " << cellid
+            << ": start handover of UE with IMSI " << imsi
+            << " RNTI " << rnti
+            << " to CellId " << targetCellId
+            << std::endl;
+}
+
+void
+NotifyHandoverEndOkEnb (std::string context, uint64_t imsi,
+                        uint16_t cellid, uint16_t rnti)
+{
+  std::cout << "HandoverEnd "
+            << " eNB CellId " << cellid
+            << ": completed handover of UE with IMSI " << imsi
+            << " RNTI " << rnti
+            << std::endl;
+}
+    
+    
+    
+    
 /***************************
  * Trace callbacks 
  ***************************/
-void LogPosition (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario)
+
+void 
+LogPosition (Ptr<OutputStreamWrapper> stream)
 {
-  for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId){
-          Ptr<Node> ue_node = ueNodes.Get (ueId);
-          Ptr<MobilityModel> mob_model = ue_node->GetObject<MobilityModel>();
-          Vector pos = mob_model->GetPosition ();
-          Vector vel = mob_model->GetVelocity ();
-	  
-          *stream->GetStream() 
-	    << Simulator::Now ().GetMicroSeconds ()
+    for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
+    {
+        Ptr<Node> ue_node = ueNodes.Get (ueId);
+        Ptr<MobilityModel> mob_model = ue_node->GetObject<MobilityModel>();
+        Vector pos = mob_model->GetPosition ();
+        Vector vel = mob_model->GetVelocity ();
+        
+        *stream->GetStream() 
+            << Simulator::Now ().GetMicroSeconds ()
             << "\t" << ueId
-            << "\t" << scenario->GetCellIndex (ueId)
+            << "\t" << GetImsi_from_ueId(ueId)
+            << "\t" << GetCellId_from_ueId(ueId)
             << "\t" << pos.x << "\t" << pos.y << "\t" << pos.z
             << "\t" << vel.x << "\t" << vel.y << "\t" << vel.z
             << std::endl;
-          }
-  Simulator::Schedule (MilliSeconds(500), &LogPosition, stream, scenario);
+    }
+    Simulator::Schedule (MilliSeconds(500), &LogPosition, stream);
 }
 
+// Trace Callback for UdpServer. This included both delayTrace and flowTrace 
+// since they both use UdpServers
+void
+udpServerTrace(std::pair<uint16_t, uint16_t> DelayPortNums,
+               std::pair<uint16_t, uint16_t> FlowPortNums,
+                const Ptr<Node> &remoteHost,
+                std::string context,
+                Ptr<const Packet> packet, 
+               const Address &from, const Address &localAddress){
+    
+    if ( (InetSocketAddress::ConvertFrom (localAddress).GetPort () == DelayPortNums.first) || (InetSocketAddress::ConvertFrom (localAddress).GetPort () == DelayPortNums.second)) {
+        delayTrace (delayStream, remoteHost, 
+                    context, packet, from, localAddress);     
+    }
+    
+    if ( (InetSocketAddress::ConvertFrom (localAddress).GetPort () == FlowPortNums.first) || (InetSocketAddress::ConvertFrom (localAddress).GetPort () == FlowPortNums.second)) {
+        flowTrace (flowStream, remoteHost, 
+                    context, packet, from, localAddress);
+        }
+        
+}
+    
+    
 // This includes both the UL and DL delay trace callbacks 
 void
-delayTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+delayTrace (Ptr<OutputStreamWrapper> stream, 
                 const Ptr<Node> &remoteHost,
                 std::string context,
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress)
@@ -274,15 +601,16 @@ delayTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* 
   else {
     dir = "DL";
     ueId = GetUeIdFromNodeId( GetNodeIdFromContext( context ) );
-  }
-
+  } 
+    
   Ptr<Node> ue_node = ueNodes.Get (ueId);
   if (InetSocketAddress::IsMatchingType (from)){
-    *stream->GetStream()
-         << Simulator::Now ().GetMicroSeconds ()
-         << "\t" << dir
-         << "\t" << ueId // ue global id
-         << "\t" << scenario->GetCellIndex (ueId) // cell global id
+      *stream->GetStream()
+          << Simulator::Now ().GetMicroSeconds ()
+              << "\t" << dir
+              << "\t" << ueId // ue global id
+	 << "\t" << GetImsi_from_ueId(ueId)
+	 << "\t" << GetCellId_from_ueId(ueId)
          << "\t" << packet_copy->GetSize () // received size
          << "\t" << seqTs.GetSeq () //current sequence number
          << "\t" << packet_copy->GetUid ()
@@ -293,7 +621,7 @@ delayTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* 
 }
 
 void
-flowTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+flowTrace (Ptr<OutputStreamWrapper> stream,
                 const Ptr<Node> &remoteHost,
                 std::string context,
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress)
@@ -324,7 +652,8 @@ flowTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* s
          << Simulator::Now ().GetMicroSeconds ()
          << "\t" << dir
          << "\t" << ueId // ue global id
-         << "\t" << scenario->GetCellIndex (ueId) // cell global id
+	 << "\t" << GetImsi_from_ueId(ueId)
+	 << "\t" << GetCellId_from_ueId(ueId)
          << "\t" << packet_copy->GetSize () // received size
          << "\t" << seqTs.GetSeq () //current sequence number
          << "\t" << packet_copy->GetUid ()
@@ -334,7 +663,7 @@ flowTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* s
     }
 }
 
-void rttTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+void rttTrace (Ptr<OutputStreamWrapper> stream,
 		std::string context, 
 		Ptr<const Packet> packet, const Address &from, const Address &localAddress)
 {
@@ -349,7 +678,8 @@ void rttTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterfac
     *stream->GetStream() 
 	 << Simulator::Now ().GetMicroSeconds ()
 	 << "\t" << ueId // ue global id
-	 << "\t" << scenario->GetCellIndex (ueId) // cell global id
+	 << "\t" << GetImsi_from_ueId(ueId)
+	 << "\t" << GetCellId_from_ueId(ueId)
          << "\t" << packet_copy->GetSize () // received size
          << "\t" << seqTs.GetSeq () //current sequence number
          << "\t" << packet_copy->GetUid ()
@@ -361,20 +691,20 @@ void rttTrace (Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterfac
 
 void
 dashClientTrace (
-                Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+                Ptr<OutputStreamWrapper> stream,
                 std::string context,
                 ClientDashSegmentInfo & info)
 {
 	
   uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
-  uint16_t cellId = scenario->GetCellIndex (ueId);
 
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           //<< "\t" << (info.node_id+1) //IMSI the + 1 is because 
 	  //this is indexed from 0 and IMSI is indexed from 1
           << "\t" << ueId
-          << "\t" << cellId
+	  << "\t" << GetImsi_from_ueId(ueId)
+	  << "\t" << GetCellId_from_ueId(ueId)
           << "\t" << info.videoId
           << "\t" << info.segId
           << "\t" << info.bitRate //newBitRate
@@ -396,18 +726,17 @@ dashClientTrace (
 
 void
 mpegPlayerTrace (
-                Ptr<OutputStreamWrapper> stream, NodeDistributionScenarioInterface* scenario,
+                Ptr<OutputStreamWrapper> stream,
                 std::string context,
-		//uint16_t & temp)
                 MpegPlayerFrameInfo & mpegInfo)
 {
 
   uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
-  uint16_t cellId = scenario->GetCellIndex (ueId);
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds ()
           << "\t" << ueId
-          << "\t" << cellId
+	  << "\t" << GetImsi_from_ueId(ueId)
+	  << "\t" << GetCellId_from_ueId(ueId)
           //<< "\t" << mpegInfo.node_id //The NS_LOG below is using m_dashClient->m_id which is different from the older version from which I copied m_dashClient->GetId(), so watch out this ID could be wrong. 
           << "\t" << mpegInfo.videoId
           << "\t" << mpegInfo.segId
@@ -421,35 +750,33 @@ mpegPlayerTrace (
           << std::endl;
 }
 
-void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream, 
-		NodeDistributionScenarioInterface* scenario,
+void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
 		std::string context,
 		const Time & delay, const Address & from, const uint32_t & size)
 {
   uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
-  uint16_t cellId = scenario->GetCellIndex (ueId);
 
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-          << "\t" << cellId
+	  << "\t" << GetImsi_from_ueId(ueId)
+	  << "\t" << GetCellId_from_ueId(ueId)
 	  << "\t" << size
 	  << "\t" << delay.GetMicroSeconds () // dl delay 
           << std::endl;
 }
 
 void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream,
-                NodeDistributionScenarioInterface* scenario,
                 std::string context,
 		const Time & rtt, const Address & from, const uint32_t & size)
 {
   uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
-  uint16_t cellId = scenario->GetCellIndex (ueId);
 
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-          << "\t" << cellId
+	  << "\t" << GetImsi_from_ueId(ueId)
+	  << "\t" << GetCellId_from_ueId(ueId)
 	  << "\t" << size
           << "\t" << rtt.GetMicroSeconds () // dl delay 
           << std::endl;
@@ -457,18 +784,17 @@ void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream,
 
 
 void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
-                NodeDistributionScenarioInterface* scenario,
                 std::string context,
 		const Time & delay, const Address & from)
 {
 	
   uint16_t ueId = GetUeNodeIdFromIpAddr (from, &ueNodes, &ueIpIfaces);
-  uint16_t cellId = scenario->GetCellIndex (ueId);
 
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-          << "\t" << cellId
+	  << "\t" << GetImsi_from_ueId(ueId)
+	  << "\t" << GetCellId_from_ueId(ueId)
 	  << "\t" << delay.GetMicroSeconds() 
           << std::endl;
 	  
@@ -479,13 +805,10 @@ void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
  **********************************************/
 
 std::pair<ApplicationContainer, Time>
-InstallDashApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             DashClientHelper *dashClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+InstallDashApps (const Ptr<Node> &ue,
+             DashClientHelper *dashClient, Time appStartTime,
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   app = dashClient->Install (ue);
@@ -493,20 +816,15 @@ InstallDashApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
                               (appStartTime + appStartWindow).GetMilliSeconds ());
   Time startTime = MilliSeconds (start);
   app.Start (startTime);
-  app.Stop (startTime + appGenerationTime);
-  //std::cout << "This app will start at " << startTime.GetSeconds () << " and stop after " << appGenerationTime.GetSeconds () << "\n" ;  
-
+  app.Stop (startTime + appGenerationTime); 
   return std::make_pair (app, startTime);
 }
 
 std::pair<ApplicationContainer, Time>
-InstallHttpApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             ThreeGppHttpClientHelper *httpClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+InstallHttpApps (const Ptr<Node> &ue,
+             ThreeGppHttpClientHelper *httpClient, Time appStartTime,
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   app = httpClient->Install (ue);
@@ -520,13 +838,10 @@ InstallHttpApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
 
 
 std::pair<ApplicationContainer, Time>
-InstallUdpEchoApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
-             UdpEchoClientHelper *echoClient, const Ptr<Node> &remoteHost,
-             const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t portNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+InstallUdpEchoApps (const Ptr<Node> &ue,
+             UdpEchoClientHelper *echoClient, Time appStartTime,
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   app = echoClient->Install (ue);
@@ -539,14 +854,12 @@ InstallUdpEchoApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
 }
 
 std::pair<ApplicationContainer, Time>
-InstallUlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
+InstallUlFlowTrafficApps (const Ptr<Node> &ue,
              UdpClientHelper *ulFlowClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t ulFlowPortNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   ulFlowClient->SetAttribute ("RemoteAddress", AddressValue (remoteHostAddr));
@@ -561,14 +874,13 @@ InstallUlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
 }
 
 std::pair<ApplicationContainer, Time>
-InstallDlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
+InstallDlFlowTrafficApps (const Ptr<Node> &ue,
              const Address &ueAddress,
              UdpClientHelper *dlFlowClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t dlFlowPortNum, const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+             const Ptr<UniformRandomVariable> &x,
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   dlFlowClient->SetAttribute ("RemoteAddress", AddressValue (ueAddress));
@@ -583,19 +895,16 @@ InstallDlFlowTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
 }
 
 std::pair<ApplicationContainer, Time>
-InstallUlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
-             const Address &ueAddress,
+InstallUlDelayTrafficApps (const Ptr<Node> &ue,
              UdpClientHelper *ulDelayClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t ulDelayPortNum,
              const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   ulDelayClient->SetAttribute ("RemoteAddress", AddressValue (remoteHostAddr));
-  app.Add(ulDelayClient->Install (ue));
+  app = ulDelayClient->Install (ue);
 
   double start = x->GetValue (appStartTime.GetMilliSeconds (),
                               (appStartTime + appStartWindow).GetMilliSeconds ());
@@ -606,15 +915,13 @@ InstallUlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
 }
 
 std::pair<ApplicationContainer, Time>
-InstallDlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
+InstallDlDelayTrafficApps (const Ptr<Node> &ue,
              const Address &ueAddress,
              UdpClientHelper *dlDelayClient,
              const Ptr<Node> &remoteHost,
              const Ipv4Address &remoteHostAddr, Time appStartTime,
-             uint16_t dlDelayPortNum,
              const Ptr<UniformRandomVariable> &x,
-             Time appGenerationTime,
-             const Ptr<LteHelper> &lteHelper, const Ptr<NrHelper> &nrHelper)
+             Time appGenerationTime)
 {
   ApplicationContainer app;
   dlDelayClient->SetAttribute ("RemoteAddress", AddressValue (ueAddress));
@@ -627,12 +934,78 @@ InstallDlDelayTrafficApps (const Ptr<Node> &ue, const Ptr<NetDevice> &ueDevice,
   app.Stop (startTime + appGenerationTime);
   return std::make_pair (app, startTime);
 }
+  
+ /***********************************************
+ * Create Log files and write column names
+ **********************************************/
+void CreateTraceFiles (void) {    
+    mobStream = traceHelper.CreateFileStream ("mobility_trace.txt");
+  *mobStream->GetStream() 
+	  << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pos_x\t" << "pos_y\t" << "pos_z\t"
+          << "vel_x\t" << "vel_y\t" << "vel_z" <<std::endl;
+ delayStream = traceHelper.CreateFileStream ("delay_trace.txt");
+  *delayStream->GetStream()
+          << "tstamp_us\t" << "dir\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp\t" << "delay" << std::endl;
+  dashClientStream = traceHelper.CreateFileStream ("dashClient_trace.txt");
+  *dashClientStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t" << "videoId\t" << "segmentId\t"
+          << "newBitRate_bps\t" << "oldBitRate_bps\t"
+          << "thputOverLastSeg_bps\t" << "avgThputOverWindow_bps(estBitRate)\t" << "frameQueueSize\t"
+          << "interTime_s\t" << "playBackTime_s\t" << "BufferTime_s\t"
+          << "deltaBufferTime_s\t" << "delayToNxtReq_s"
+          << std::endl;
+  mpegPlayerStream = traceHelper.CreateFileStream ("mpegPlayer_trace.txt");
+  *mpegPlayerStream->GetStream()
+          << "tstamp_us\t" << "ueId\t"  << "IMSI\t" << "cellId\t" << "videoId\t" << "segmentId\t"
+          << "resolution\t" << "frameId\t"
+          << "playbackTime\t" << "type\t" << "size\t"
+          << "interTime\t" << "queueSize"
+          << std::endl;
+  httpClientDelayStream = traceHelper.CreateFileStream ("httpClientDelay_trace.txt");
+  *httpClientDelayStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pktSize\t" << "delay" << std::endl;
+  httpClientRttStream = traceHelper.CreateFileStream ("httpClientRtt_trace.txt");
+  *httpClientRttStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pktSize\t" << "delay" << std::endl;
+  httpServerDelayStream = traceHelper.CreateFileStream ("httpServerDelay_trace.txt");
+  *httpServerDelayStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "delay" << std::endl;
+  flowStream = traceHelper.CreateFileStream ("flow_trace.txt");
+  *flowStream->GetStream()
+          << "tstamp_us\t" << "dir\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp\t" << "delay" << std::endl;
+  rttStream = traceHelper.CreateFileStream ("rtt_trace.txt");
+  *rttStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp_us\t" << "delay" << std::endl;
 
-
+  topologyStream = traceHelper.CreateFileStream ("gnb_locations.txt");    
+}    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 // Print the scenario parameters
 
-std::ostream &
-operator << (std::ostream & os, const Parameters & parameters)
+std::ostream & operator << (std::ostream & os, const Parameters & parameters)
 {
   // Use p as shorthand for arg parametersx
   auto p {parameters};
@@ -641,45 +1014,26 @@ operator << (std::ostream & os, const Parameters & parameters)
   os << "\n" << m << std::left \
      << std::setw (40 - strlen (m)) << (strlen (m) > 0 ? ":" : "")
 
-
-  MSG ("LENA LTE Scenario Parameters");
+  MSG ("Scenario Parameters");
   MSG ("");
-  MSG ("Model version")
-    << p.simulator << (p.simulator == "LENA" ? " (v1)" : " (v2)");
+  MSG ("Radio access technology")
+    << p.simulator;
   if (p.simulator == "5GLENA")
     {
-      //MSG ("LTE Standard")
-      //  << p.radioNetwork << (p.radioNetwork == "LTE" ? " (4G)" : " (5G NR)");
-      //MSG ("4G-NR calibration mode") << (p.calibration ? "ON" : "off");
-      MSG ("4G-NR ULPC mode") << (p.enableUlPc ? "Enabled" : "Disabled");
-      MSG ("Operation mode") << p.operationMode;
+      MSG ("NR Uplink Power Control mode") << (p.enableUlPc ? "Enabled" : "Disabled");
+      MSG ("UL/DL duplexing mode") << p.operationMode;
       if (p.operationMode == "TDD")
         {
           MSG ("Numerology") << p.numerologyBwp;
           MSG ("TDD pattern") << p.pattern;
         }
-      //if (p.errorModel != "")
-      //  {
-      //    MSG ("Error model") << p.errorModel;
-      //  }
-      //else if (p.radioNetwork == "LTE")
-      //  {
-      //    MSG ("Error model") << "ns3::LenaErrorModel";
-      //  }
-     // else if (p.radioNetwork == "NR")
-     //   {
-          MSG ("Error model") << "ns3::NrEesmCcT2";
-     //   }
-
     }
   else
     {
-      // LENA v1
-      p.operationMode = "FDD";
-      MSG ("LTE Standard") << "4G";
-      //MSG ("Calibration mode") << (p.calibration ? "ON" : "off");
-      MSG ("LTE ULPC mode") << (p.enableUlPc ? "Enabled" : "Disabled");
-      MSG ("Operation mode") << p.operationMode;
+      // LTE
+      MSG ("LTE Uplink Power Control mode") << (p.enableUlPc ? "Enabled" : "Disabled");
+      MSG ("UL/DL duplexing mode") << p.operationMode;
+      MSG ("Handover Algorithm") << p.handoverAlgo;
     }
 
   if (p.baseStationFile != "" and p.useSiteFile)
@@ -690,13 +1044,21 @@ operator << (std::ostream & os, const Parameters & parameters)
     {
       MSG ("Base station positions") << "regular hexaonal lay down";
       MSG ("Number of rings") << p.numOuterRings;
+      MSG ("Micro cell layer of base stations? ") << p.useMicroLayer;
+      if (p.useMicroLayer)
+      {
+          MSG ("Micro cell BS layout") << "random drop";
+          MSG ("Micro cell BS antenna pattern") << "isotropic";
+          MSG ("Num. of micro BSs") << p.numMicroCells;
+          MSG ("Tx power of micro cell BSs") << p.microCellTxPower;
+      }
     }
   MSG ("");
   MSG ("Channel bandwidth") << p.bandwidthMHz << " MHz";
   MSG ("Spectrum configuration")
     <<    (p.freqScenario == 0 ? "non-" : "") << "overlapping";
-  MSG ("LTE Scheduler") << p.scheduler;
-
+  MSG ("Scheduler") << p.scheduler;
+     
   MSG ("");
   MSG ("Basic scenario") << p.scenario;
   if (p.scenario == "UMa")
@@ -715,109 +1077,18 @@ operator << (std::ostream & os, const Parameters & parameters)
     {
       os << "\n  (unknown configuration)";
     }
-  if (p.baseStationFile == "" and p.useSiteFile)
-    {
-      MSG ("Number of outer rings") << p.numOuterRings;
-    }
-  MSG ("Number of UEs per sector") << p.ueNumPergNb;
+  MSG ("Number of UEs per gNodeB (per sector)") << p.ueNumPergNb;
   MSG ("Antenna down tilt angle (deg)") << p.downtiltAngle;
 
   MSG ("");
-  MSG ("Network loading") << p.trafficScenario;
-  switch (p.trafficScenario)
-    {
-      case 0:
-        MSG ("  Max loading (80 Mbps/20 MHz)");
-        MSG ("  Number of packets") << "infinite";
-        MSG ("  Packet size");
-        switch (p.bandwidthMHz)
-          {
-            case 20:
-              os << "1000 bytes";
-              break;
-            case 10:
-              os << "500 bytes";
-              break;
-            case 5:
-              os << "250 bytes";
-              break;
-            default:
-              os << "1000 bytes";
-          }
-        // 1 s / (10000 / nUes)
-        MSG ("  Inter-packet interval (per UE)") << p.ueNumPergNb / 10.0 << " ms";
-        break;
-
-      case 1:
-        MSG ("  Latency");
-        MSG ("  Number of packets") << 1;
-        MSG ("  Packet size") << "12 bytes";
-        MSG ("  Inter-packet interval (per UE)") << "1 s";
-        break;
-
-      case 2:
-        MSG ("  Moderate loading");
-        MSG ("  Number of packets") << "infinite";
-        MSG ("  Packet size");
-        switch (p.bandwidthMHz)
-          {
-            case 20:
-              os << "125 bytes";
-              break;
-            case 10:
-              os << "63 bytes";
-              break;
-            case 5:
-              os << "32 bytes";
-              break;
-            default:
-              os << "125 bytes";
-          }
-        // 1 s / (1000 / nUes)
-        MSG ("  Inter-packet interval (per UE)") << 1 / (1000 / p.ueNumPergNb) << " s";
-
-        break;
-
-      case 3:
-        MSG ("  Moderate-high loading");
-        MSG ("  Number of packets") << "infinite";
-        MSG ("  Packet size");
-        switch (p.bandwidthMHz)
-          {
-            case 20:
-              os << "250 bytes";
-              break;
-            case 10:
-              os << "125 bytes";
-              break;
-            case 5:
-              os << "75 bytes";
-              break;
-            default:
-              os << "250 bytes";
-          }
-        // 1 s / (10000 / nUes)
-        MSG ("  Inter-packet interval (per UE)") << 1 / (10000.0 / p.ueNumPergNb) << " s";
-
-        break;
-      default:
-        os << "\n  (Unknown configuration)";
-    }
-
-  MSG ("Application start window") << p.appStartTime.As (Time::MS) << " + " << appStartWindow.As (Time::MS);
-  MSG ("Application on duration") << p.appGenerationTime.As (Time::MS);
-  MSG ("Traffic direction") << p.direction;
+  MSG ("Simulations duration") << p.appGenerationTime.As (Time::S);
 
   MSG ("");
-  //MSG ("Output file name") << p.simTag;
-  //MSG ("Output directory") << p.outputDir;
-  MSG ("Logging") << (p.logging ? "ON" : "off");
   MSG ("Trace file generation") << (p.traces ? "ON" : "off");
   MSG ("");
   os << std::endl;
   return os;
 }
-
 
 } // namespace ns3
 

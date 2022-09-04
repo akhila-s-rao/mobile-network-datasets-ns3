@@ -35,8 +35,6 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-//#include <ns3/sqlite-output.h>
-//#include "flow-monitor-output-stats.h"
 #include "lena-v1-utils.h"
 #include "lena-v2-utils.h"
 #include <iomanip>
@@ -50,71 +48,146 @@ namespace ns3 {
 
 struct Parameters
 {
-  friend
-  std::ostream &
-  operator << (std::ostream & os, const Parameters & parameters);
-  bool Validate (void) const;
+    friend
+    std::ostream &
+    operator << (std::ostream & os, const Parameters & parameters);
 
-  // Deployment topology parameters
-  uint16_t numOuterRings = 1;
-  uint16_t ueNumPergNb = 30;
-  std::string simulator = "LENA";
-  std::string scenario = "UMa";
-  std::string baseStationFile = ""; // path to file of tower/site coordinates
-  bool useSiteFile = false; // whether to use baseStationFile parameter,
+    // Deployment topology parameters
+    
+    uint16_t numOuterRings = 0;
+    uint16_t ueNumPergNb = 3;
+    std::string simulator = "LENA";
+    std::string scenario = "UMi";
+    uint16_t numMicroCells = 21;
+    uint16_t microCellTxPower = 30;
+    //uint16_t numMacroCellsWithMicroLayer = 2;
+    bool useMicroLayer = false;
+    
+    std::string baseStationFile = ""; // path to file of tower/site coordinates
+    bool useSiteFile = false; // whether to use baseStationFile parameter,
                             //or to use numOuterRings parameter to create a scenario
+    double ueHeight = 1.5;
 
-  // Simulation parameters
-  // Don't use double for seconds, use  milliseconds and integers.
-  bool logging = true;
-  bool traces = true;
-  Time appGenerationTime = Seconds (1000);
-  Time appStartTime = MilliSeconds (500);
-  Time progressInterval = Seconds (1);
-  uint32_t randSeed = 13;
+    // Simulation parameters
+    // Don't use double for seconds, use  milliseconds and integers.
+    
+    bool logging = false; // NS_LOG for debugging
+    bool traces = true;
+    Time appGenerationTime = Seconds (1000);
+    Time appStartTime = MilliSeconds (500);
+    Time progressInterval = Seconds (1);
+    uint32_t randSeed = 13;
+    uint16_t ranSamplePeriodMilli = 20;  
+        
 
-  // RAN parameters
-  std::string operationMode = "FDD";  // TDD or FDD for NR. Only FDD available for LTE
-  uint16_t numerologyBwp = 0; // NR specific
-  // legend: F->flexible DL->downlink  UL->uplink S->special(LTE DL)
-  std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|" //NR specific
-  uint32_t bandwidthMHz = 10;
-  bool enableUlPc = false;
-  std::string scheduler = "PF";
-  uint32_t freqScenario = 0; // 0->non-overlaping 1->overlapping
-  double downtiltAngle = 0;
+    // RAN parameters
+    
+    std::string operationMode = "FDD";  // TDD or FDD for NR. Only FDD available for LTE
+    uint16_t numerologyBwp = 0; // NR specific
+    // legend: F->flexible DL->downlink  UL->uplink S->special(LTE DL)
+    std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; 
+    // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|" //NR specific
+    uint32_t bandwidthMHz = 10; // MHz
+    uint32_t microBandwidthMHz = 20; //MHz
+    bool enableUlPc = true;
+    std::string scheduler = "PF";
+    uint32_t freqScenario = 1; // 0->non-overlaping 1->overlapping
+    double downtiltAngle = 0;
+    std::string handoverAlgo = "A3Rsrp"; // Options are "A3Rsrp" or "A2A4Rsrq"
+    uint32_t manualHoTriggerTime = 256 ;// milliSeconds 
+    bool macroMicroSharedSpectrum = true;
+    
+    // network parameters
+    
+    uint32_t tcpSndRcvBuf = 1000*1024;  
+    
+    // mobility model 
+    
+    double slowUeMinSpeed = 0.5; // m/s
+    double slowUeMaxSpeed = 1.5; // m/s
+    double fastUeMinSpeed = 5; // m/s
+    double fastUeMaxSpeed = 15; // m/s
+    double fracFastUes = 0.2; 
 
-  // mobility model 
-  double ueMinSpeed = 1.4; // m/s
-  double ueMaxSpeed = 10; // m/s
+    // Application traffic parameters
+    
+    bool traceDelay = true;
+    bool traceRtt = true;
+    bool traceHttp = true;
+    bool traceDash = true;
+    
+    bool traceFlow = false;
+    
+    // under construction !
+    double dash_fracOfUes = 0.3;
+    double http_fracOfUes = 0.3;
+    double bulkSend_fracOfUes = 0.3;
+    // These should not sum to one because 1 - these is the number of UEs 
+    // that dont run any application and only do delay measurements 
+    
+    
+    // DASH video streaming 
+    
+    double targetDt = 20.0; // The target time difference between receiving and playing a frame. [s].
+    double window = 5.0; // The window for measuring the average throughput. [s].
+    uint32_t bufferSpace = 10*(1000000); // The space in bytes that is used for buffering the video
+    std::string abr = "ns3::FdashClient";
 
-  // traffic parameters
+    // web browsing (http client)
+    
+    uint32_t httpMainObjMean = 102400; 
+    uint32_t httpMainObjStd = 40960;
 
-  // DASH video streaming 
-  double targetDt = 20.0; // The target time difference between receiving and playing a frame. [s]. 
-  double window = 5.0; // The window for measuring the average throughput. [s].
-  uint32_t bufferSpace = 10000000; // 10 MB The space in bytes that is used for buffering the video
-  std::string abr = "ns3::FdashClient";
+    // UDP flow
+    
+    uint32_t flowPacketSize = 1400;
+    double trafficLoadFrac = 0.1; // fraction of total BW of the basestation to be used by UDP flow range (0,1)
+    
+    std::string direction = "both"; // "UL", "DL" or "both"
+
+    // UDP one way delay probes 
+    
+    uint32_t delayPacketSize = 1400;
+    Time delayInterval = Seconds (0.1);
+
+    // UDP echo 
+    
+    uint32_t echoPacketSize = 1400;
+    Time echoInterPacketInterval = Seconds (0.1);
+
+    
+    
+    
+    
+    
+    /**********************************************************************/
+    
   
-  // web browsing (http client)
-  uint32_t httpMainObjMean = 102400;
-  uint32_t httpMainObjStd = 40960;
-
-  // UDP flow
-  //uint32_t flowPacketSize = 1400;
-  uint32_t trafficScenario = 0; 
-  std::string direction = "both"; // "UL", "DL" or "both"
-
-  // UDP one way delay probes 
-  uint32_t delayPacketSize = 1400;
-  Time delayInterval = Seconds (0.1);
-
-  // UDP echo 
-  uint32_t echoPacketSize = 1400;
-  Time echoInterPacketInterval = Seconds (0.1);
-
-};
-
+    // Validate scenario parameter that this setting has   
+    bool Validate (void) const
+    {
+        NS_ABORT_MSG_IF (bandwidthMHz != 20 && bandwidthMHz != 10 && bandwidthMHz != 5,
+                       "Valid bandwidth values are 20, 10, 5, you set " << bandwidthMHz);
+        NS_ABORT_MSG_IF (trafficLoadFrac < 0 || trafficLoadFrac > 1.0,
+                       "Traffic load fraction " << trafficLoadFrac << " not valid. It shoudl be in the range (0,1)");
+        NS_ABORT_MSG_IF (numerologyBwp > 4,
+                       "At most 4 bandwidth parts supported.");
+        NS_ABORT_MSG_IF (direction != "DL" && direction != "UL" && direction != "both",
+                       "Flow direction can only be DL, UL or both: " << direction);
+        NS_ABORT_MSG_IF (operationMode != "TDD" && operationMode != "FDD",
+                       "Operation mode can only be TDD or FDD: " << operationMode);
+        NS_ABORT_MSG_IF (simulator != "LENA" && simulator != "5GLENA",
+                       "Unrecognized simulator: " << simulator);
+        NS_ABORT_MSG_IF (scheduler != "PF" && scheduler != "RR",
+                       "Unrecognized scheduler: " << scheduler);
+        NS_ABORT_MSG_IF (handoverAlgo != "A3Rsrp" && handoverAlgo != "A2A4Rsrq",
+                       "Unrecognized handover algorithm: " << handoverAlgo);
+        NS_ABORT_MSG_IF (useMicroLayer && simulator != "LENA",
+                       "Cannot create micro layer unless using 4G LENA: ");
+        return true;
+    }   
+};      
+        
 extern void LenaLteComparison (const Parameters &params);
 
 } // namespace ns3

@@ -27,48 +27,7 @@
 NS_LOG_COMPONENT_DEFINE ("LenaV2Utils");
 
 namespace ns3 {
-/*
-void
-LenaV2Utils::ReportSinrNr (SinrOutputStats *stats, uint16_t cellId, uint16_t rnti,
-                           double power, double avgSinr, uint16_t bwpId)
-{
-  stats->SaveSinr (cellId, rnti, power, avgSinr, bwpId);
-}
 
-void
-LenaV2Utils::ReportPowerNr (PowerOutputStats *stats, const SfnSf & sfnSf,
-                            Ptr<const SpectrumValue> txPsd, const Time &t, uint16_t rnti, uint64_t imsi,
-                            uint16_t bwpId, uint16_t cellId)
-{
-  stats->SavePower (sfnSf, txPsd, t, rnti, imsi, bwpId, cellId);
-}
-
-void
-LenaV2Utils::ReportSlotStatsNr (SlotOutputStats *stats, const SfnSf &sfnSf, uint32_t scheduledUe,
-                                uint32_t usedReg, uint32_t usedSym,
-                                uint32_t availableRb, uint32_t availableSym, uint16_t bwpId,
-                                uint16_t cellId)
-{
-  stats->SaveSlotStats (sfnSf, scheduledUe, usedReg, usedSym,
-                        availableRb, availableSym, bwpId, cellId);
-}
-
-void
-LenaV2Utils::ReportRbStatsNr (RbOutputStats *stats, const SfnSf &sfnSf, uint8_t sym,
-                              const std::vector<int> &rbUsed, uint16_t bwpId,
-                              uint16_t cellId)
-{
-  stats->SaveRbStats (sfnSf, sym, rbUsed, bwpId, cellId);
-}
-
-void
-LenaV2Utils::ReportGnbRxDataNr (PowerOutputStats *gnbRxDataStats, const SfnSf &sfnSf,
-                                Ptr<const SpectrumValue> rxPsd, const Time &t, uint16_t bwpId,
-                                uint16_t cellId)
-{
-  gnbRxDataStats->SavePower (sfnSf, rxPsd, t, 0, 0, bwpId, cellId);
-}
-*/
 void
 LenaV2Utils::ConfigureBwpTo (BandwidthPartInfoPtr & bwp, double centerFreq, double bwpBw)
 {
@@ -115,7 +74,6 @@ void
 LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
                                            const std::string &scenario,
                                            const std::string &operationMode,
-                                           //const std::string &direction,
                                            uint16_t numerology,
                                            const std::string &pattern,
                                            const NodeContainer &gnbSector1Container,
@@ -133,11 +91,6 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
                                            NetDeviceContainer &ueSector2NetDev,
                                            NetDeviceContainer &ueSector3NetDev,
                                            bool enableUlPc,
-                                           //std::string powerAllocation,
-                                           //SinrOutputStats *sinrStats,
-                                           //PowerOutputStats *ueTxPowerStats,
-                                           //PowerOutputStats *gnbRxPowerStats,
-                                           //SlotOutputStats *slotStats, RbOutputStats *rbStats,
                                            const std::string &scheduler,
                                            uint32_t bandwidthMHz, uint32_t freqScenario,
                                            double downtiltAngle)
