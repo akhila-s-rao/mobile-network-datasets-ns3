@@ -21,6 +21,9 @@
 #include <ns3/nstime.h>
 #include <string>
 #include <ostream>
+
+#include <filesystem>
+
 #include "ns3/dash-module.h"
 #include "ns3/core-module.h"
 #include "ns3/config-store.h"
@@ -40,6 +43,12 @@
 #include <iomanip>
 #include "ns3/log.h"
 
+//For VR app
+#include "ns3/seq-ts-size-frag-header.h"
+#include "ns3/bursty-helper.h"
+#include "ns3/burst-sink-helper.h"
+#include "ns3/trace-file-burst-generator.h"
+
 #include "lena-lte-comparison.h"
 #include "lena-lte-comparison-functions.h"
 
@@ -54,7 +63,7 @@ void LenaLteComparison (const Parameters &params){
     // Set as global for easy access
     global_params = params;
 
-    RngSeedManager::SetSeed (3); 
+    RngSeedManager::SetSeed (params.randSeed+1); 
     RngSeedManager::SetRun (params.randSeed);
 
     // NS logging 
@@ -69,7 +78,9 @@ void LenaLteComparison (const Parameters &params){
     LogComponentEnable ("DashClient", LOG_LEVEL_ALL);
     LogComponentEnable ("ThreeGppHttpServer", LOG_LEVEL_INFO);
     LogComponentEnable ("ThreeGppHttpClient", LOG_LEVEL_INFO);*/
-
+    LogComponentEnable ("BurstyApplication", LOG_ALL);
+    LogComponentEnable ("BurstSink", LOG_ALL);
+    
     // Create Trace files and write the column names 
     // To prevent the should trigger HO Preparation Failure, but it is not implemented ASSERT
     Config::SetDefault ("ns3::LteEnbMac::NumberOfRaPreambles", UintegerValue (40));
@@ -96,6 +107,19 @@ void LenaLteComparison (const Parameters &params){
     
     // Create user created trace files with corresponding column names
     CreateTraceFiles ();
+    
+    std::string traceFolder = params.ns3Dir + "src/vr-app/model/BurstGeneratorTraces/"; // example traces can be found here
+    // The current working directory set to direct the log files generated into the run specific folders
+    //std::filesystem::path cwd = std::filesystem::current_path();
+    //std::cout << "Current working directory is " << cwd.string() << std::endl;
+    // Where the executable I am running is located 
+    //std::cout << "This executable is located at " << ns3::SystemPath::FindSelfDirectory() << std::endl;	
+
+    // Trace files for VR     
+    std::string vrTraceFiles[8]
+        = {"mc_10mbps_30fps.csv", "ge_cities_10mbps_30fps.csv", "ge_tour_10mbps_30fps.csv", "vp_10mbps_30fps.csv", 
+        "mc_10mbps_60fps.csv", "ge_cities_10mbps_60fps.csv", "ge_tour_10mbps_60fps.csv", "vp_10mbps_60fps.csv"};
+    uint16_t vrTraceFileIndex = 0;
     
     /**********************************************
     * Create scenario
@@ -554,6 +578,7 @@ void LenaLteComparison (const Parameters &params){
     uint16_t ulDelayPortNum = 17000;
     uint16_t dlDelayPortNum = 18000;
     uint16_t dashPortNum = 15000;
+    uint16_t vrPortNum = 16000;
 
     uint32_t echoPacketCount = 0xFFFFFFFF; 
     uint32_t delayPacketCount = 0xFFFFFFFF; 
@@ -588,16 +613,20 @@ void LenaLteComparison (const Parameters &params){
     // Server Config 
     ApplicationContainer serverApps;
 
-    // Declaration of Helpers for Servers 
+    // Declaration of Helpers for Sinks and Servers 
     UdpServerHelper ulDelayPacketSink (ulDelayPortNum);
     UdpServerHelper dlDelayPacketSink (dlDelayPortNum);
     UdpServerHelper ulFlowPacketSink (ulFlowPortNum);
     UdpServerHelper dlFlowPacketSink (dlFlowPortNum);
     ThreeGppHttpServerHelper httpServer (remoteHostAddr);
-    DashServerHelper dashServer ("ns3::TcpSocketFactory",
-                    InetSocketAddress (Ipv4Address::GetAny (), dashPortNum));
+    DashServerHelper dashServer ("ns3::TcpSocketFactory", 
+                                 InetSocketAddress (Ipv4Address::GetAny (), dashPortNum));
     UdpEchoServerHelper echoServer (echoPortNum);
-
+    //vr  
+    Ptr<UniformRandomVariable> vrStart = CreateObject<UniformRandomVariable> ();
+    vrStart->SetAttribute ("Min", DoubleValue (params.vrStartTimeMin));
+    vrStart->SetAttribute ("Max", DoubleValue (params.vrStartTimeMax));
+    
     // Server Creation 
     if(params.traceDelay)
     {
@@ -627,7 +656,6 @@ void LenaLteComparison (const Parameters &params){
         serverApps.Add (echoServer.Install (remoteHost)); // appId updated on remoteHost
     }
 
-
     //========================================================
     // Client Config 
     ApplicationContainer clientApps;
@@ -640,7 +668,10 @@ void LenaLteComparison (const Parameters &params){
     UdpEchoClientHelper echoClient (remoteHostAddr, echoPortNum);
     DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum), params.abr);
     ThreeGppHttpClientHelper httpClient (remoteHostAddr);
-
+    //vr
+    BurstSinkHelper burstSinkHelper ("ns3::UdpSocketFactory",
+                                   InetSocketAddress (Ipv4Address::GetAny (), vrPortNum));
+    
     // Client Config
     if(params.traceFlow)
     {  
@@ -687,6 +718,10 @@ void LenaLteComparison (const Parameters &params){
     if(params.traceHttp)
     {
         // Configure http client application
+    }
+    if(params.traceVr)
+    {
+        // Nothing to configure
     }
 
     // Client Creation on the desired devices
@@ -737,8 +772,28 @@ void LenaLteComparison (const Parameters &params){
         // These are the apps that are on a subset of devices 
         if (ueId % 5 == 0)
         {
-            // These UEs do just delay measurement. So nothing extra to add
-            // Print the IMSI of the ues that are doing this
+            // temp
+            if(ueId==5)
+            if(params.traceVr)
+            {
+                // Random sample for the start time fo the VR session for each UE  
+                double vrStartTime = vrStart->GetValue();
+                // The sender of VR traffic to be installed on remoteHost
+                BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
+                                           InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
+                burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
+                burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
+                                                "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
+                                                "StartTime", DoubleValue (vrStartTime));
+                vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
+                serverApps.Add (burstyHelper.Install (remoteHost));
+                // The receiver of the VR traffic to be installed on UEs
+                clientApps.Add (burstSinkHelper.Install (node));
+                // Print the IMSI of the ues that are doing this	
+                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                    << " Ip_addr: " << addr 
+                    << " has VR app installed " << std::endl;
+            }
         } 
 
 
@@ -894,7 +949,13 @@ void LenaLteComparison (const Parameters &params){
             Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ThreeGppHttpServer/RxDelay", 
                              MakeBoundCallback (&httpServerTraceRxDelay, httpServerDelayStream));
         }
-
+        if(params.traceVr)
+        {
+            Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::BurstSink/BurstRx", 
+                             MakeBoundCallback (&BurstRx, burstRxStream));
+            Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::BurstSink/FragmentRx", 
+                             MakeBoundCallback (&FragmentRx, fragmentRxStream));
+        }
     }
 
     // Add some extra time for the last generated packets to be received
@@ -909,6 +970,7 @@ void LenaLteComparison (const Parameters &params){
     // after the simulation is setup and UEs attached
     Simulator::Schedule (MilliSeconds(100), &ScenarioInfo, scenario);
     
+    /*
     // To schedule on/off of apps that I would like to pause and resume randomly 
     Ptr<UniformRandomVariable> appOnTime = CreateObject<UniformRandomVariable> ();
     appOnTime->SetAttribute ("Min", DoubleValue (1));
@@ -917,24 +979,21 @@ void LenaLteComparison (const Parameters &params){
     appOffTime->SetAttribute ("Min", DoubleValue (1));
     appOffTime->SetAttribute ("Max", DoubleValue (30));
     // sample ON time and pass both on and off random variables  
-    // 
-    
-    
-    //Simulator::Schedule (Seconds(appOnTime->GetValue()), &PauseApp, appOnTime, appOffTime);
-    
-    
-    
-    if ( (params.simulator == "LENA") && (params.useMicroLayer) && (!params.macroMicroSharedSpectrum))
+    Simulator::Schedule (Seconds(appOnTime->GetValue()), &PauseApp, appOnTime, appOffTime);
+    */
+    /*if ( (params.simulator == "LENA") && (params.useMicroLayer) && (!params.macroMicroSharedSpectrum))
     {
         // This is a nearest cell manual HO that works even between frequencies 
         Simulator::Schedule (MilliSeconds(params.manualHoTriggerTime), &CheckForManualHandovers, lteHelper); 
-    }
+    }*/
+    
     Simulator::Run ();
     std::cout << "\n------------------------------------------------------\n"
             << "End simulation"
             << std::endl;
     Simulator::Destroy ();
-    }
+}// end of LenaLteComparison
+    
 
-} // namespace ns3
+} // end of namespace ns3
 

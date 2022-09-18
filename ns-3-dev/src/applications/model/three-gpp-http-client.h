@@ -361,6 +361,11 @@ private:
   /// Determined after parsing the main object.
   uint32_t     m_embeddedObjectsToBeRequested;
 
+  //akhila
+  // A counter for the number of webpages sent. This can be used to track of 
+  // page load time from RTT of main and embedded objects  
+  uint16_t   m_webpageCounter;
+  
   // ATTRIBUTES
 
   /// The `Variables` attribute.
@@ -395,7 +400,7 @@ private:
   /// The `RxDelay` trace source.
   ns3::TracedCallback<const Time &, const Address &, const uint32_t &>  m_rxDelayTrace;
   /// The `RxRtt` trace source.
-  ns3::TracedCallback<const Time &, const Address &, const uint32_t &>  m_rxRttTrace;
+  ns3::TracedCallback<const uint16_t &, const std::string &, const Time &, const Address &, const uint32_t &>  m_rxRttTrace;
   /// The `StateTransition` trace source.
   ns3::TracedCallback<const std::string &, const std::string &> m_stateTransitionTrace;
 

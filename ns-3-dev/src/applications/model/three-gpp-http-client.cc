@@ -220,6 +220,8 @@ ThreeGppHttpClient::StartApplication ()
       NS_FATAL_ERROR ("Invalid state " << GetStateString ()
                                        << " for StartApplication().");
     }
+    //akhila
+    m_webpageCounter = 0;
 }
 
 
@@ -580,7 +582,7 @@ ThreeGppHttpClient::ReceiveMainObject (Ptr<Packet> packet, const Address &from)
 
           if (!m_objectClientTs.IsZero ())
             {
-              m_rxRttTrace (Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
+              m_rxRttTrace (m_webpageCounter, "main", Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
               m_objectClientTs = MilliSeconds (0); // Reset back to zero.
             }
 
@@ -641,7 +643,7 @@ ThreeGppHttpClient::ReceiveEmbeddedObject (Ptr<Packet> packet, const Address &fr
 
           if (!m_objectClientTs.IsZero ())
             {
-              m_rxRttTrace (Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
+              m_rxRttTrace (m_webpageCounter, "embedded", Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
               m_objectClientTs = MilliSeconds (0); // Reset back to zero.
             }
 
@@ -799,7 +801,9 @@ void
 ThreeGppHttpClient::EnterReadingTime ()
 {
   NS_LOG_FUNCTION (this);
-
+  // update webpage counter
+  m_webpageCounter++;  
+    
   if (m_state == EXPECTING_EMBEDDED_OBJECT || m_state == PARSING_MAIN_OBJECT)
     {
       const Time readingTime = m_httpVariables->GetReadingTime ();

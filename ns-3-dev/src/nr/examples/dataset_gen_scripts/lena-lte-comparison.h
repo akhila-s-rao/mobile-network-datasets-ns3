@@ -51,6 +51,8 @@ struct Parameters
     friend
     std::ostream &
     operator << (std::ostream & os, const Parameters & parameters);
+    // To locate trace files 
+    std::string ns3Dir = "/home/ubuntu/mobile-network-datasets-ns3/ns-3-dev/";
 
     // Deployment topology parameters
     
@@ -87,7 +89,7 @@ struct Parameters
     // legend: F->flexible DL->downlink  UL->uplink S->special(LTE DL)
     std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; 
     // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|" //NR specific
-    uint32_t bandwidthMHz = 10; // MHz
+    uint32_t bandwidthMHz = 20; // MHz
     uint32_t microBandwidthMHz = 20; //MHz
     bool enableUlPc = true;
     std::string scheduler = "PF";
@@ -96,6 +98,8 @@ struct Parameters
     std::string handoverAlgo = "A3Rsrp"; // Options are "A3Rsrp" or "A2A4Rsrq"
     uint32_t manualHoTriggerTime = 256 ;// milliSeconds 
     bool macroMicroSharedSpectrum = true;
+    // This needs to be adjusted according to data bandwidth, or one will not be able to use the full BW of the RAN 
+    uint32_t rlcUmTxBuffSize = 100*1024;  
     
     // network parameters
     
@@ -112,10 +116,12 @@ struct Parameters
     // Application traffic parameters
     
     bool traceDelay = true;
-    bool traceRtt = true;
+    bool traceRtt = false;
     bool traceHttp = true;
-    bool traceDash = true;
+    bool traceDash = false;
+    bool traceVr = false; 
     
+    // don't neeed this for now
     bool traceFlow = false;
     
     // under construction !
@@ -124,6 +130,11 @@ struct Parameters
     double bulkSend_fracOfUes = 0.3;
     // These should not sum to one because 1 - these is the number of UEs 
     // that dont run any application and only do delay measurements 
+    
+    
+    // VR
+    double vrStartTimeMin = 2; // seconds 
+    double vrStartTimeMax = 5; // seconds
     
     
     // DASH video streaming 

@@ -78,6 +78,7 @@ ns-3-dev/cmake-build-relwithdebinfo/
 ns-3-dev/cmake-build-minsizerel/
 ns-3-dev/cmake-build-release/
 
+.ipynb_checkpoints/
 
 ns-3-dev/logs/
 ns-3-dev/plot

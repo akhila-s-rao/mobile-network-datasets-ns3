@@ -72,6 +72,9 @@ Ptr<OutputStreamWrapper> httpServerDelayStream;
 Ptr<OutputStreamWrapper> flowStream;
 Ptr<OutputStreamWrapper> rttStream;
 Ptr<OutputStreamWrapper> topologyStream;         
+Ptr<OutputStreamWrapper> fragmentRxStream;
+Ptr<OutputStreamWrapper> burstRxStream;   
+    
     
 /***************************
  * Structure Definitions
@@ -108,6 +111,7 @@ bool isFromMicroLayer (uint16_t cellId);
 bool isFromMacroLayer (uint16_t cellId);    
 uint16_t GetImsi_from_ueId(uint16_t ueId);
 uint16_t GetCellId_from_ueId(uint16_t ueId);
+Ipv4Address GetIpAddrFromUeId(uint16_t ueId);
 void ScenarioInfo (NodeDistributionScenarioInterface* scenario);
 //bool Parameters::Validate (void) const;
 void NotifyConnectionEstablishedUe (std::string context, uint64_t imsi,
@@ -147,7 +151,7 @@ void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
 		const Time & delay, const Address & from, const uint32_t & size);
 void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream,
                 std::string context,
-		const Time & rtt, const Address & from, const uint32_t & size);
+		const uint16_t & webpageId, const std::string & object_type, const Time & rtt, const Address & from, const uint32_t & size);
 void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
                 std::string context,
 		const Time & delay, const Address & from);
@@ -158,6 +162,14 @@ void flowTrace (Ptr<OutputStreamWrapper> stream,
 void rttTrace (Ptr<OutputStreamWrapper> stream,
                 std::string context, 
                 Ptr<const Packet> packet, const Address &from, const Address &localAddress);
+void BurstRx (Ptr<OutputStreamWrapper> stream,
+                std::string context, Ptr<const Packet> burst, const Address &from, const Address &to,
+         const SeqTsSizeFragHeader &header);
+void FragmentRx (Ptr<OutputStreamWrapper> stream,
+                std::string context, Ptr<const Packet> fragment, const Address &from, const Address &to,
+         const SeqTsSizeFragHeader &header);    
+    
+    
 std::pair<ApplicationContainer, Time> 
 InstallDashApps (const Ptr<Node> &ue,
              DashClientHelper *dashClient, Time appStartTime, 
@@ -244,6 +256,16 @@ GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes,
   }
   NS_ASSERT (knownSender);
   return(666); // the number of the beast
+}
+
+Ipv4Address 
+GetIpAddrFromUeId (uint16_t ueId)
+{
+    Ptr<Node> ue_node = ueNodes.Get (ueId);
+    Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+    Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+    Ipv4Address addr = iaddr.GetLocal ();
+    return(addr);
 }
 
 bool 
@@ -759,25 +781,27 @@ void httpClientTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-	  << "\t" << GetImsi_from_ueId(ueId)
-	  << "\t" << GetCellId_from_ueId(ueId)
-	  << "\t" << size
-	  << "\t" << delay.GetMicroSeconds () // dl delay 
+          << "\t" << GetImsi_from_ueId(ueId)
+          << "\t" << GetCellId_from_ueId(ueId)
+          << "\t" << size
+          << "\t" << delay.GetMicroSeconds () // dl delay 
           << std::endl;
 }
 
 void httpClientTraceRxRtt ( Ptr<OutputStreamWrapper> stream,
                 std::string context,
-		const Time & rtt, const Address & from, const uint32_t & size)
+		const uint16_t & webpageId, const std::string & object_type, const Time & rtt, const Address & from, const uint32_t & size)
 {
   uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
 
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-	  << "\t" << GetImsi_from_ueId(ueId)
-	  << "\t" << GetCellId_from_ueId(ueId)
-	  << "\t" << size
+          << "\t" << GetImsi_from_ueId(ueId)
+          << "\t" << GetCellId_from_ueId(ueId)
+          << "\t" << webpageId
+          << "\t" << object_type
+          << "\t" << size
           << "\t" << rtt.GetMicroSeconds () // dl delay 
           << std::endl;
 }
@@ -793,13 +817,55 @@ void httpServerTraceRxDelay ( Ptr<OutputStreamWrapper> stream,
   *stream->GetStream()
           << Simulator::Now ().GetMicroSeconds () //tstamp_us
           << "\t" << ueId
-	  << "\t" << GetImsi_from_ueId(ueId)
-	  << "\t" << GetCellId_from_ueId(ueId)
-	  << "\t" << delay.GetMicroSeconds() 
+          << "\t" << GetImsi_from_ueId(ueId)
+          << "\t" << GetCellId_from_ueId(ueId)
+          << "\t" << delay.GetMicroSeconds() 
           << std::endl;
 	  
 }
 
+void
+BurstRx (Ptr<OutputStreamWrapper> stream, std::string context,
+         Ptr<const Packet> burst, const Address &from, const Address &to,
+         const SeqTsSizeFragHeader &header)
+{
+    uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
+    Time now = Simulator::Now ();
+    *stream->GetStream()
+        << now.GetMicroSeconds () //tstamp_us
+        << "\t" << ueId 
+        << "\t" << GetImsi_from_ueId(ueId)
+        << "\t" << GetCellId_from_ueId(ueId)   
+        << "\t" << header.GetSeq () // burst seqnum
+        << "\t" << header.GetSize () //burst size 
+        << "\t" << header.GetFrags () // total num of fragments in this burst
+        << std::endl;
+}    
+
+void
+FragmentRx (Ptr<OutputStreamWrapper> stream, std::string context,
+            Ptr<const Packet> fragment, const Address &from, const Address &to,
+         const SeqTsSizeFragHeader &header)
+{
+    uint16_t ueId = GetUeIdFromNodeId (GetNodeIdFromContext(context));
+    Time now = Simulator::Now ();
+    *stream->GetStream()
+        << now.GetMicroSeconds () //tstamp_us
+        << "\t" << ueId 
+        << "\t" << GetImsi_from_ueId(ueId)
+        << "\t" << GetCellId_from_ueId(ueId)   
+        << "\t" << header.GetSeq () // burst seq num
+        << "\t" << header.GetSize () // burst size
+        << "\t" << header.GetFrags () // total num of fragments in this burst 
+        << "\t" << header.GetFragSeq () // fragment seq num
+        << "\t" << header.GetTs().GetMicroSeconds () // Tx time of the fragment     
+        << "\t" << (now - header.GetTs ()).GetMicroSeconds () // delay to receive this fragment
+        // NOTE: You cannnot sum fragment delays to get burst delay since 
+        // many fragments are not sent one after the other and instead in a burst, 
+        // so many fragments could be scheduled together  
+        << std::endl;
+}    
+    
 /***********************************************
  * Install client applications
  **********************************************/
@@ -947,7 +1013,7 @@ void CreateTraceFiles (void) {
  delayStream = traceHelper.CreateFileStream ("delay_trace.txt");
   *delayStream->GetStream()
           << "tstamp_us\t" << "dir\t" << "ueId\t" << "IMSI\t" << "cellId\t"
-          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp\t" << "delay" << std::endl;
+          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp_us\t" << "delay" << std::endl;
   dashClientStream = traceHelper.CreateFileStream ("dashClient_trace.txt");
   *dashClientStream->GetStream()
           << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t" << "videoId\t" << "segmentId\t"
@@ -969,8 +1035,9 @@ void CreateTraceFiles (void) {
           << "pktSize\t" << "delay" << std::endl;
   httpClientRttStream = traceHelper.CreateFileStream ("httpClientRtt_trace.txt");
   *httpClientRttStream->GetStream()
-          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
-          << "pktSize\t" << "delay" << std::endl;
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t" 
+          << "webpageId\t" << "objectType\t"    
+          << "objectSize\t" << "delay" << std::endl;
   httpServerDelayStream = traceHelper.CreateFileStream ("httpServerDelay_trace.txt");
   *httpServerDelayStream->GetStream()
           << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
@@ -978,12 +1045,20 @@ void CreateTraceFiles (void) {
   flowStream = traceHelper.CreateFileStream ("flow_trace.txt");
   *flowStream->GetStream()
           << "tstamp_us\t" << "dir\t" << "ueId\t" << "IMSI\t" << "cellId\t"
-          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp\t" << "delay" << std::endl;
+          << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp_us\t" << "delay" << std::endl;
   rttStream = traceHelper.CreateFileStream ("rtt_trace.txt");
   *rttStream->GetStream()
           << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
           << "pktSize\t" << "seqNum\t" << "pktUid\t" << "txTstamp_us\t" << "delay" << std::endl;
-
+  fragmentRxStream = traceHelper.CreateFileStream ("vrFragment_trace.txt");
+  *fragmentRxStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "burstSeqNum\t" << "burstSize\t" << "numFragsInBurst\t" << "fragSeqNum\t" << "txTstamp_us\t" << "delay" << std::endl;  
+  burstRxStream = traceHelper.CreateFileStream ("vrBurst_trace.txt");
+  *burstRxStream->GetStream()
+          << "tstamp_us\t" << "ueId\t" << "IMSI\t" << "cellId\t"
+          << "burstSeqNum\t" << "burstSize\t" << "numFragsInBurst" << std::endl;   
+    
   topologyStream = traceHelper.CreateFileStream ("gnb_locations.txt");    
 }    
     
