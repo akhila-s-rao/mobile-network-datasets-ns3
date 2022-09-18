@@ -1,5 +1,6 @@
 # First kill any simulations ciurrently running
-pkill ns3.35-lena-lte
+pkill ns3.35-cellular
+
 sleep 1
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
@@ -11,17 +12,17 @@ cd ../../../../
 # ==============================
 # This is the first set of runs 
 # ==============================
-len=20
-#i=2
-for (( i=0; i<$len; i++ ))
-do
-  cmd_args="lena-lte-comparison-user \
+#len=20
+i=3
+#for (( i=0; i<$len; i++ ))
+#do
+  cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
 	   --numMicroCells=3 \
-	   --ueNumPergNb=5 \
-	   --useMicroLayer=true \
-	   --appGenerationTime=100 \
+	   --ueNumPergNb=2 \
+	   --useMicroLayer=false \
+	   --appGenerationTime=1000 \
 	   --simulator=LENA \
 	   --operationMode=FDD \
            --randomSeed=$i"
@@ -31,8 +32,9 @@ do
   mkdir "$data_dir/$run_dir"
 
   # Without gdb debug mode 
-  taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir" \
-    > "$data_dir/$run_dir/console_log.txt" &
+  taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir" #\
+    #> "$data_dir/$run_dir/console_log.txt" #\
+    #2> "$data_dir/$run_dir/stderr_log.txt" &
 
   # With gdb debug mode 
   #./waf --gdb --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir" 
@@ -47,7 +49,7 @@ do
   echo "Saving input parameters used for run by saving this run_script.sh"
   cp $run_script_loc/run_script.sh "$data_dir/$run_dir/."
   sleep 2
-done
+#done
 
 
 

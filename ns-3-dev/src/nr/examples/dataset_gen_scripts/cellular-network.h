@@ -35,13 +35,13 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-#include "lena-v1-utils.h"
-#include "lena-v2-utils.h"
+#include "lte-utils.h"
+#include "nr-utils.h"
 #include <iomanip>
 #include "ns3/log.h"
 
-#ifndef LENA_LTE_COMPARISON_H
-#define LENA_LTE_COMPARISON_H
+#ifndef CELLULAR_NETWORK_H
+#define CELLULAR_NETWORK_H
 
 namespace ns3 {
 
@@ -199,8 +199,8 @@ struct Parameters
     }   
 };      
         
-extern void LenaLteComparison (const Parameters &params);
+extern void CellularNetwork (const Parameters &params);
 
 } // namespace ns3
 
-#endif // LENA_LTE_COMPARISON_H
+#endif // CELLULAR_NETWORK_H

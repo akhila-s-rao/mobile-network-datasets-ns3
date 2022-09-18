@@ -3,7 +3,7 @@
 #include <ns3/command-line.h>
 #include <ns3/show-progress.h>
 
-#include "lena-lte-comparison.h"
+#include "cellular-network.h"
 
 using namespace ns3;
 
@@ -110,7 +110,7 @@ main (int argc, char *argv[])
 
   ShowProgress spinner (params.progressInterval);
   
-  LenaLteComparison (params);
+  CellularNetwork (params);
 
   return 0;
 }

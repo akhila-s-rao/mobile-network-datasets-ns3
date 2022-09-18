@@ -38,8 +38,8 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-#include "lena-v1-utils.h"
-#include "lena-v2-utils.h"
+#include "lte-utils.h"
+#include "nr-utils.h"
 #include <iomanip>
 #include "ns3/log.h"
 
@@ -49,14 +49,14 @@
 #include "ns3/burst-sink-helper.h"
 #include "ns3/trace-file-burst-generator.h"
 
-#include "lena-lte-comparison.h"
-#include "lena-lte-comparison-functions.h"
+#include "cellular-network.h"
+#include "cellular-network-functions.h"
 
-NS_LOG_COMPONENT_DEFINE ("LenaLteComparison");
+NS_LOG_COMPONENT_DEFINE ("CellularNetwork");
 
 namespace ns3 {
     
-void LenaLteComparison (const Parameters &params){
+void CellularNetwork (const Parameters &params){
 
     // Validate the parameter settings  
     params.Validate ();
@@ -94,7 +94,7 @@ void LenaLteComparison (const Parameters &params){
     Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
     Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
 
-    // This is set in the lena-v1-utils (not v2) 
+    // This is set in the lte-utils (not nr-utils) 
     //Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (10 * 1024)); //default is 10240 
 
     Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (params.tcpSndRcvBuf));// default is 131072
@@ -311,7 +311,7 @@ void LenaLteComparison (const Parameters &params){
     if (params.simulator == "LENA")
     {
         epcHelper = CreateObject<PointToPointEpcHelper> ();
-        LenaV1Utils::SetLenaV1SimulatorParameters (params, 
+        LteUtils::SetLteSimulatorParameters (params, 
                                                  sector0AngleRad,
                                                  gnbSector1Container,
                                                  gnbSector2Container,
@@ -331,7 +331,7 @@ void LenaLteComparison (const Parameters &params){
     else if (params.simulator == "5GLENA")
     {
         epcHelper = CreateObject<NrPointToPointEpcHelper> ();
-        LenaV2Utils::SetLenaV2SimulatorParameters (sector0AngleRad,
+        NrUtils::SetNrSimulatorParameters (sector0AngleRad,
                                                  params.scenario,
                                                  params.operationMode,
                                                  params.numerologyBwp,

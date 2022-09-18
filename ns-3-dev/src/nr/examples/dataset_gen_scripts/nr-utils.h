@@ -16,8 +16,8 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#ifndef LENA_V2_UTILS_H
-#define LENA_V2_UTILS_H
+#ifndef NR_UTILS_H
+#define NR_UTILS_H
 
 #include <ns3/nr-module.h>
 #include <ns3/hexagonal-grid-scenario-helper.h>
@@ -29,11 +29,11 @@ class PowerOutputStats;
 class SlotOutputStats;
 class RbOutputStats;
 
-class LenaV2Utils
+class NrUtils
 {
 public:
   static
-  void SetLenaV2SimulatorParameters (const double sector0AngleRad,
+  void SetNrSimulatorParameters (const double sector0AngleRad,
                                      const std::string &scenario,
                                      const std::string &operationMode,
                                      //const std::string &direction,
@@ -89,4 +89,4 @@ public:
 
 } // namespace ns3
 
-#endif // LENA_V2_UTILS_H
+#endif // NR_UTILS_H

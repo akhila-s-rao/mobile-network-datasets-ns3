@@ -16,7 +16,7 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "lena-v2-utils.h"
+#include "nr-utils.h"
 #include <ns3/enum.h>
 //#include "flow-monitor-output-stats.h"
 #include <ns3/nr-spectrum-value-helper.h>
@@ -24,12 +24,12 @@
 
 #include "ns3/log.h"
 
-NS_LOG_COMPONENT_DEFINE ("LenaV2Utils");
+NS_LOG_COMPONENT_DEFINE ("NrUtils");
 
 namespace ns3 {
 
 void
-LenaV2Utils::ConfigureBwpTo (BandwidthPartInfoPtr & bwp, double centerFreq, double bwpBw)
+NrUtils::ConfigureBwpTo (BandwidthPartInfoPtr & bwp, double centerFreq, double bwpBw)
 {
   bwp->m_centralFrequency = centerFreq;
   bwp->m_higherFrequency = centerFreq + (bwpBw / 2);
@@ -71,7 +71,7 @@ void ConfigurePhy (Ptr<NrHelper> &nrHelper,
 }  // unnamed namespace
 
 void
-LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
+NrUtils::SetNrSimulatorParameters (const double sector0AngleRad,
                                            const std::string &scenario,
                                            const std::string &operationMode,
                                            uint16_t numerology,
@@ -196,7 +196,7 @@ LenaV2Utils::SetLenaV2SimulatorParameters (const double sector0AngleRad,
    * |---------CC0---------|
    * |---------BWP0--------|
    *
-   * This is tightly coupled with what happens in lena-v1-utils.cc
+   * This is tightly coupled with what happens in lte-utils.cc
    *
    */
   // \todo: set band 0 start frequency from the command line

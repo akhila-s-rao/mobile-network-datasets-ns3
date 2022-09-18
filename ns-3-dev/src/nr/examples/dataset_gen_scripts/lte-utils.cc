@@ -16,14 +16,14 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "lena-v1-utils.h"
-#include "lena-v2-utils.h"
-#include "lena-lte-comparison.h"
+#include "lte-utils.h"
+#include "nr-utils.h"
+#include "cellular-network.h"
 
 namespace ns3 {
 
 void
-LenaV1Utils::SetLenaV1SimulatorParameters (const Parameters &params, 
+LteUtils::SetLteSimulatorParameters (const Parameters &params, 
                                            const double sector0AngleRad,
                                            NodeContainer enbSector1Container,
                                            NodeContainer enbSector2Container,

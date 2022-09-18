@@ -16,21 +16,21 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#ifndef LENA_V1_UTILS_H
-#define LENA_V1_UTILS_H
+#ifndef LTE_UTILS_H
+#define LTE_UTILS_H
 
 #include <ns3/nr-module.h>
 #include <ns3/hexagonal-grid-scenario-helper.h>
 #include <ns3/lte-module.h>
-#include "lena-lte-comparison.h"
+#include "cellular-network.h"
 
 namespace ns3 {
 
-class LenaV1Utils
+class LteUtils
 {
 public:
   static void
-  SetLenaV1SimulatorParameters (const Parameters &params, 
+  SetLteSimulatorParameters (const Parameters &params, 
   const double sector0AngleRad,
                                 NodeContainer enbSector1Container,
                                 NodeContainer enbSector2Container,
@@ -50,4 +50,4 @@ public:
 
 } // namespace ns3
 
-#endif // LENA_V1_UTILS_H
+#endif // LTE_UTILS_H

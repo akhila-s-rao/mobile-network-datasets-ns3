@@ -37,8 +37,8 @@ def build(bld):
     obj.source = 'cttc-nr-notching.cc'
     #obj = bld.create_ns3_program('cttc-realistic-beamforming', ['nr', 'stats'])
     #obj.source = 'cttc-realistic-beamforming.cc'
-    obj = bld.create_ns3_program('lena-lte-comparison-user', ['nr','dash', 'vr-app'])
-    obj.source = 'dataset_gen_scripts/lena-lte-comparison.cc dataset_gen_scripts/lena-lte-comparison-user.cc dataset_gen_scripts/lena-v1-utils.cc dataset_gen_scripts/lena-v2-utils.cc'
+    obj = bld.create_ns3_program('cellular-network-user', ['nr','dash', 'vr-app'])
+    obj.source = 'dataset_gen_scripts/cellular-network.cc dataset_gen_scripts/cellular-network-user.cc dataset_gen_scripts/lte-utils.cc dataset_gen_scripts/nr-utils.cc'
     #obj = bld.create_ns3_program('lena-lte-comparison-campaign', ['nr','flow-monitor','dash'])
     #obj.source = 'lena-lte-comparison/lena-lte-comparison.cc lena-lte-comparison/flow-monitor-output-stats.cc lena-lte-comparison/lena-v1-utils.cc lena-lte-comparison/lena-v2-utils.cc'
 

@@ -34,15 +34,15 @@
 #include "ns3/lte-module.h"
 #include <ns3/radio-environment-map-helper.h>
 #include "ns3/config-store-module.h"
-#include "lena-v1-utils.h"
-#include "lena-v2-utils.h"
+#include "lte-utils.h"
+#include "nr-utils.h"
 #include <iomanip>
 #include "ns3/log.h"
 
-#include "lena-lte-comparison.h"
+#include "cellular-network.h"
 
-#ifndef LENA_LTE_COMPARISON_FUNCTION_H
-#define LENA_LTE_COMPARISON_FUNCTION_H
+#ifndef CELLULAR_NETWORK_FUNCTION_H
+#define CELLULAR_NETWORK_FUNCTION_H
 
 namespace ns3 {
 
@@ -1167,4 +1167,4 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
 
 } // namespace ns3
 
-#endif // LENA_LTE_COMPARISON_FUNCTION_H
+#endif // CELLULAR_NETWORK_FUNCTION_H
