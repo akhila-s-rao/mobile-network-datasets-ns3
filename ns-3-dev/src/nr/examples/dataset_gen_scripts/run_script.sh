@@ -1,55 +1,70 @@
-# First kill any simulations ciurrently running
+# First kill any simulations currently running
 pkill ns3.35-cellular
-
 sleep 1
+
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
-
 num_sim_campaigns=1
+
+# Save the directory location which has the run script and the simulations script
 run_script_loc=$(pwd)
+
 # Go to the home directory of ns3 where ./waf exists
 cd ../../../../
+
+script_save_dir_name="scripts_used_to_gen_this_data"
+
 # ==============================
 # This is the first set of runs 
 # ==============================
-#len=20
-i=3
-#for (( i=0; i<$len; i++ ))
-#do
+# The location for saving data relative to ns-3-dev
+#data_dir1="../../data_volume/lte_21macro_21Ue_delay_rtt_1Ue_dlThput" 
+data_dir1="../../data_volume/logs"
+
+# Saving all scripts and code used for this set of simulation runs
+mkdir $data_dir1
+echo "Saving all scripts and code used for this set of simulation runs in $data_dir1"
+mkdir "$data_dir1/$script_save_dir_name"
+# Save all relevant scripts (this script and the ns3 scripts)
+cp -r "$run_script_loc/"* "$data_dir1/$script_save_dir_name/."
+
+
+#len=10
+len=1
+#i=3
+for (( i=0; i<$len; i++ ))
+do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
+       --ueNumPergNb=1 \
+       --useMicroLayer=false \
 	   --numMicroCells=3 \
-	   --ueNumPergNb=2 \
-	   --useMicroLayer=false \
-	   --appGenerationTime=1000 \
-	   --simulator=LENA \
+	   --appGenerationTime=100 \
+	   --rat=LTE \
 	   --operationMode=FDD \
-           --randomSeed=$i"
+       --appDlThput=true \
+       --randomSeed=$i"
 
-  run_dir="run$(($i + 1))" 
-  data_dir="../../data_volume/logs"  
-  mkdir "$data_dir/$run_dir"
+  run_dir="run$(($i + 1))"  
+  mkdir "$data_dir1/$run_dir"
 
-  # Without gdb debug mode 
-  taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir" #\
-    #> "$data_dir/$run_dir/console_log.txt" #\
-    #2> "$data_dir/$run_dir/stderr_log.txt" &
+  # Run 
+  taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" \
+    > "$data_dir1/$run_dir/simulation_info.txt" & #\
+    #2> "$data_dir1/$run_dir/stderr_log.txt" &
 
-  # With gdb debug mode 
-  #./waf --gdb --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir" 
-  #> "$data_dir/$run_dir/console_log.txt"
+  # Run with gdb debug mode 
+  #./waf --gdb --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" 
+  #> "$data_dir1/$run_dir/console_log.txt"
 
-  # With valgring debug mdoe
-  #./waf --valgrind --run-no-build "$cmd_args" --cwd="$data_dir/$run_dir"
-  #./waf --run --command-template="valgrind --leak-check=full --show-reachable=yes %s" "$cmd_args --cwd=$data_dir/$run_dir"
-
+  # Run with valgring debug mode
+  #./waf --valgrind --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir"
+  #./waf --run --command-template="valgrind --leak-check=full --show-reachable=yes %s" "$cmd_args --cwd=$data_dir1/$run_dir"
 
   echo "Started run $(($i + 1))" 
-  echo "Saving input parameters used for run by saving this run_script.sh"
-  cp $run_script_loc/run_script.sh "$data_dir/$run_dir/."
   sleep 2
-#done
+done
 
 
 
@@ -60,28 +75,42 @@ i=3
 if [ $num_sim_campaigns -eq 2 ]
 then
 
+echo "SECOND SET OF RUNS"
+
+# The location for saving data relative to ns-3-dev
+data_dir2="../../data_volume/lte_21macro_21Ue_delay_rtt_1Ue_ulThput" 
+mkdir $data_dir2
+# Saving all scripts and code used for this set of simulation runs
+echo "Saving all scripts and code used for this set of simulation runs in $data_dir2"
+mkdir "$data_dir2/$script_save_dir_name"
+# Save all relevant scripts (this script and the ns3 scripts)
+cp -r "$run_script_loc/"* "$data_dir2/$script_save_dir_name/."
+
 len=10
+#i=3
 for (( i=0; i<$len; i++ ))
 do
-  cmd_args="lena-lte-comparison-user \
-           --scenario=UMi \
-           --numRings=1 \
-           --ueNumPergNb=30 \
-           --appGenerationTime=1000 \
-           --numerologyBwp=0 \
-           --simulator=5GLENA \
-           --trafficScenario=0 \
-           --randomSeed=$i"
+  cmd_args="cellular-network-user \
+	   --scenario=UMi \
+	   --numRings=1 \
+       --ueNumPergNb=1 \
+       --useMicroLayer=false \
+	   --numMicroCells=3 \
+	   --appGenerationTime=500 \
+	   --rat=LTE \
+	   --operationMode=FDD \
+       --appUlThput=false \
+       --randomSeed=$i"
 
   run_dir="run$(($i + 1))"  
-  mkdir ../../logs/$run_dir
+  mkdir "$data_dir2/$run_dir"
 
-taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="../../logs/$run_dir" \
-  > "../../logs/$run_dir/console_log.txt" &
+  # Run 
+  taskset -c $(($i + 10)) ./waf --run-no-build "$cmd_args" --cwd="$data_dir2/$run_dir" \
+    > "$data_dir2/$run_dir/simulation_info.txt" & #\
+    #2> "$data_dir2/$run_dir/stderr_log.txt" &
 
   echo "Started run $(($i + 1))" 
-  echo "Saving input parameters used for run by saving this run_script.sh"
-  cp $run_script_loc/run_script.sh "../../logs/$run_dir/."
   sleep 2
 done
 

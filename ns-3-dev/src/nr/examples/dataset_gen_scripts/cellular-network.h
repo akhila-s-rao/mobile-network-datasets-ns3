@@ -58,7 +58,7 @@ struct Parameters
     
     uint16_t numOuterRings = 0;
     uint16_t ueNumPergNb = 3;
-    std::string simulator = "LENA";
+    std::string rat = "LTE";
     std::string scenario = "UMi";
     uint16_t numMicroCells = 21;
     uint16_t microCellTxPower = 30;
@@ -89,7 +89,7 @@ struct Parameters
     // legend: F->flexible DL->downlink  UL->uplink S->special(LTE DL)
     std::string pattern = "F|F|F|F|F|F|F|F|F|F|"; 
     // Pattern can be e.g. "DL|S|UL|UL|DL|DL|S|UL|UL|DL|" //NR specific
-    uint32_t bandwidthMHz = 20; // MHz
+    uint32_t bandwidthMHz = 10; // MHz
     uint32_t microBandwidthMHz = 20; //MHz
     bool enableUlPc = true;
     std::string scheduler = "PF";
@@ -115,31 +115,27 @@ struct Parameters
 
     // Application traffic parameters
     
+    // delay measurement 
     bool traceDelay = true;
-    bool traceRtt = false;
-    bool traceHttp = true;
+    bool traceRtt = true;
+    // traffic apps to make it interesting
+    bool traceHttp = false;
     bool traceDash = false;
     bool traceVr = false; 
+    // throughput measurement using full buffer traffic 
+    bool traceUlThput = false;
+    bool traceDlThput = false;
     
     // don't neeed this for now
     bool traceFlow = false;
-    
-    // under construction !
-    double dash_fracOfUes = 0.3;
-    double http_fracOfUes = 0.3;
-    double bulkSend_fracOfUes = 0.3;
-    // These should not sum to one because 1 - these is the number of UEs 
-    // that dont run any application and only do delay measurements 
-    
     
     // VR
     double vrStartTimeMin = 2; // seconds 
     double vrStartTimeMax = 5; // seconds
     
-    
     // DASH video streaming 
     
-    double targetDt = 20.0; // The target time difference between receiving and playing a frame. [s].
+    double targetDt = 30.0; // The target time difference between receiving and playing a frame. [s].
     double window = 5.0; // The window for measuring the average throughput. [s].
     uint32_t bufferSpace = 10*(1000000); // The space in bytes that is used for buffering the video
     std::string abr = "ns3::FdashClient";
@@ -167,6 +163,8 @@ struct Parameters
     Time echoInterPacketInterval = Seconds (0.1);
 
     
+    // Throughput measurement using BulkSend
+    uint32_t ThputPacketSize = 1400;
     
     
     
@@ -187,14 +185,14 @@ struct Parameters
                        "Flow direction can only be DL, UL or both: " << direction);
         NS_ABORT_MSG_IF (operationMode != "TDD" && operationMode != "FDD",
                        "Operation mode can only be TDD or FDD: " << operationMode);
-        NS_ABORT_MSG_IF (simulator != "LENA" && simulator != "5GLENA",
-                       "Unrecognized simulator: " << simulator);
+        NS_ABORT_MSG_IF (rat != "LTE" && rat != "NR",
+                       "Unrecognized simulator: " << rat);
         NS_ABORT_MSG_IF (scheduler != "PF" && scheduler != "RR",
                        "Unrecognized scheduler: " << scheduler);
         NS_ABORT_MSG_IF (handoverAlgo != "A3Rsrp" && handoverAlgo != "A2A4Rsrq",
                        "Unrecognized handover algorithm: " << handoverAlgo);
-        NS_ABORT_MSG_IF (useMicroLayer && simulator != "LENA",
-                       "Cannot create micro layer unless using 4G LENA: ");
+        NS_ABORT_MSG_IF (useMicroLayer && rat != "LTE",
+                       "Cannot create micro layer unless using 4G LTE: ");
         return true;
     }   
 };      

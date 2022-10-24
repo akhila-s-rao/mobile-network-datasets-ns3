@@ -167,7 +167,7 @@ void CellularNetwork (const Parameters &params){
     scenario = &gridScenario;
 
     // Log the topology configuration 
-    std::cout << "\nTopology Configuration: " << gnbSites << " sites, "
+    std::cout << "\nMacro topology Configuration: " << gnbSites << " sites, "
             << sectors << " sectors/site, "
             << macroLayerGnbNodes.GetN ()   << " macro cells, "
             << ueNodes.GetN ()    << " UEs\n";
@@ -225,14 +225,14 @@ void CellularNetwork (const Parameters &params){
     boundingBoxMinY = boundingBoxMinY - hexCellRadius;
     boundingBoxMaxX = boundingBoxMaxX + hexCellRadius;
     boundingBoxMaxY = boundingBoxMaxY + hexCellRadius;
-    std::cout << "Topology Bounding box: "
+    std::cout << "Topology Bounding box (x,y): "
             << "(" << boundingBoxMinX << ", " << boundingBoxMinY << ")  "
             << "(" << boundingBoxMinX << ", " << boundingBoxMaxY << ")  "
             << "(" << boundingBoxMaxX << ", " << boundingBoxMinY << ")  "
             << "(" << boundingBoxMaxX << ", " << boundingBoxMaxY << ")  "
             //<< " UE height: " << ueZ
-            << "\nX width: " << (boundingBoxMaxX - boundingBoxMinX)
-            << "  Y width: " << (boundingBoxMaxY - boundingBoxMinY)
+            << "\nArea X width: " << (boundingBoxMaxX - boundingBoxMinX) << " meters"
+            << "  Area Y width: " << (boundingBoxMaxY - boundingBoxMinY) << " meters\n"
             << std::endl;
     
     
@@ -308,7 +308,7 @@ void CellularNetwork (const Parameters &params){
     Ptr <LteHelper> lteHelper = nullptr;
     Ptr <NrHelper> nrHelper = nullptr;
 
-    if (params.simulator == "LENA")
+    if (params.rat == "LTE")
     {
         epcHelper = CreateObject<PointToPointEpcHelper> ();
         LteUtils::SetLteSimulatorParameters (params, 
@@ -328,7 +328,7 @@ void CellularNetwork (const Parameters &params){
                                                  ueSector2NetDev,
                                                  ueSector3NetDev);
     }
-    else if (params.simulator == "5GLENA")
+    else if (params.rat == "NR")
     {
         epcHelper = CreateObject<NrPointToPointEpcHelper> ();
         NrUtils::SetNrSimulatorParameters (sector0AngleRad,
@@ -384,7 +384,7 @@ void CellularNetwork (const Parameters &params){
         // Configure a new lteHelper and install all the RAN stuff
         // Is it okay to have 2 lteHelpers ?
 
-        Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (params.microCellTxPower)); // Don't know what this shoudl be set to 
+        Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (params.microCellTxPower)); // Don't know what this should be set to 
 
         /*
         Ptr<LteHelper> microLteHelper = CreateObject<LteHelper> ();
@@ -608,7 +608,10 @@ void CellularNetwork (const Parameters &params){
     double load = params.trafficLoadFrac * dataRate * 1000000; // bps
     double flowPerUe = load / (flowUeCount / allGnbNodes.GetN()); // bps
     Time flowInterval = Seconds ( (params.flowPacketSize*8)/load );  
-    std::cout << "\nUDP flow has a per flow rate of " << (flowPerUe/1000000) << " Mbps\n" << std::endl; 
+    if(params.traceFlow)
+    {
+        std::cout << "\nFlow App (UDP) has a per flow rate of " << (flowPerUe/1000000) << " Mbps\n" << std::endl;
+    }
 
     // Server Config 
     ApplicationContainer serverApps;
@@ -752,9 +755,9 @@ void CellularNetwork (const Parameters &params){
                               startRng, params.appGenerationTime);
             clientApps.Add (appsClass3.first);
             // Print the IMSI of the ues that are doing this	
-            std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+            /*std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
                 << " Ip_addr: " << addr 
-                << " has UL and DL Delay app installed " << std::endl;
+                << " has UL and DL Delay app installed " << std::endl;*/
         }
         if(params.traceRtt)
         {
@@ -763,37 +766,59 @@ void CellularNetwork (const Parameters &params){
                               params.appStartTime,
                               startRng, params.appGenerationTime);
             clientApps.Add (appsClass1.first);
-            std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId)  
+            /*std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId)  
               << " IP_addr: " << addr
-              <<" has RTT app installed" << std::endl;
+              <<" has RTT app installed" << std::endl;*/
         } 
-
-
+        // Install full buffer BulkSend traffic on only one UE to test the 
+        // TCP throughput achieved as the UE moves within the topology
+        // This should be installed on one of the fast speed UEs so that it can 
+        // cover more distance and visit more cells 
+        if(params.traceUlThput)
+        {
+            if(ueId == 0)
+            {
+                uint32_t port = 20000;
+                BulkSendHelper ulBulkSendHelper ("ns3::TcpSocketFactory",
+                                             InetSocketAddress (remoteHostAddr, port));
+                ulBulkSendHelper.SetAttribute ("MaxBytes", UintegerValue (0)); // send forever
+                ulBulkSendHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));
+                clientApps.Add (ulBulkSendHelper.Install (node));
+                PacketSinkHelper ulPacketSinkHelper ("ns3::TcpSocketFactory",
+                                                   InetSocketAddress (Ipv4Address::GetAny (), port));
+                ulPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));   
+                serverApps.Add (ulPacketSinkHelper.Install (remoteHost));
+                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                    << " IP_addr: " << addr 
+                    <<" has UL Throughput measurement (BulkSend) app installed" << std::endl;
+            }
+        }
+        if(params.traceDlThput)
+        {
+            if(ueId == 0)
+            {
+                uint32_t port = 19000;
+                BulkSendHelper dlBulkSendHelper ("ns3::TcpSocketFactory",
+                                             InetSocketAddress (addr, port));
+                dlBulkSendHelper.SetAttribute ("MaxBytes", UintegerValue (0)); // send forever
+                dlBulkSendHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));
+                clientApps.Add (dlBulkSendHelper.Install (remoteHost));
+                PacketSinkHelper dlPacketSinkHelper ("ns3::TcpSocketFactory",
+                                                   InetSocketAddress (Ipv4Address::GetAny (), port));
+                dlPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true)); 
+                serverApps.Add (dlPacketSinkHelper.Install (node));
+                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                    << " IP_addr: " << addr 
+                    <<" has DL Throughput measurement (BulkSend) app installed" << std::endl;
+                
+            }
+        }
+        
+        
         // These are the apps that are on a subset of devices 
         if (ueId % 5 == 0)
         {
-            // temp
-            if(ueId==5)
-            if(params.traceVr)
-            {
-                // Random sample for the start time fo the VR session for each UE  
-                double vrStartTime = vrStart->GetValue();
-                // The sender of VR traffic to be installed on remoteHost
-                BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
-                                           InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
-                burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
-                burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
-                                                "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
-                                                "StartTime", DoubleValue (vrStartTime));
-                vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
-                serverApps.Add (burstyHelper.Install (remoteHost));
-                // The receiver of the VR traffic to be installed on UEs
-                clientApps.Add (burstSinkHelper.Install (node));
-                // Print the IMSI of the ues that are doing this	
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                    << " Ip_addr: " << addr 
-                    << " has VR app installed " << std::endl;
-            }
+
         } 
 
 
@@ -868,6 +893,38 @@ void CellularNetwork (const Parameters &params){
                 }
         }
     } // end of for over UEs
+    
+    if(params.traceVr)
+    {
+        // Iterate over the UEs that are selected to have a VR app on them 
+        // These UEs are slow moving UEs close to micro layer BSs with their higher BW
+        for (uint32_t ueId = 0; ueId < 0; ++ueId)
+        {
+            Ptr<Node> node = ueNodes.Get (ueId);
+            Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
+            Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+            Ipv4Address addr = iaddr.GetLocal ();
+
+            // Random sample for the start time fo the VR session for each UE  
+            double vrStartTime = vrStart->GetValue();
+            // The sender of VR traffic to be installed on remoteHost
+            BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
+                                       InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
+            burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
+            burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
+                                            "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
+                                            "StartTime", DoubleValue (vrStartTime));
+            vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
+            serverApps.Add (burstyHelper.Install (remoteHost));
+            // The receiver of the VR traffic to be installed on UEs
+            clientApps.Add (burstSinkHelper.Install (node));
+            // Print the IMSI of the ues that are doing this	
+            std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                << " Ip_addr: " << addr 
+                << " has VR app installed " << std::endl;
+        }
+    }
+
 
     // Server Start  
     serverApps.Start (params.appStartTime);
@@ -925,7 +982,7 @@ void CellularNetwork (const Parameters &params){
         //Config::Connect ("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart",
         //               MakeCallback (&NotifyHandoverStartUe));
         Config::Connect ("/NodeList/*/DeviceList/*/LteEnbRrc/HandoverStart",
-                       MakeCallback (&NotifyHandoverStartEnb));
+                       MakeBoundCallback (&NotifyHandoverStartEnb, handoverStream));
         
 
         if(params.traceRtt)
@@ -955,6 +1012,11 @@ void CellularNetwork (const Parameters &params){
                              MakeBoundCallback (&BurstRx, burstRxStream));
             Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::BurstSink/FragmentRx", 
                              MakeBoundCallback (&FragmentRx, fragmentRxStream));
+        }
+        if(params.traceUlThput || params.traceDlThput)
+        {
+            Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::PacketSink/RxWithSeqTsSize", 
+                             MakeBoundCallback (&ThputMeasurement, thputStream));
         }
     }
 
