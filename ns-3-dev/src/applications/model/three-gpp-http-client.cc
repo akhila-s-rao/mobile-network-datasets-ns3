@@ -455,6 +455,11 @@ ThreeGppHttpClient::RequestMainObject ()
       header.SetContentLength (0); // Request does not need any content length.
       header.SetContentType (ThreeGppHttpHeader::MAIN_OBJECT);
       header.SetClientTs (Simulator::Now ());
+      //akhila
+      m_objectClientTs = Simulator::Now ();
+      /*std::cout << "Debug: " << "RequestMainObject " 
+              << "m_objectClientTs being set to " << m_objectClientTs.GetMicroSeconds()
+              << std::endl;*/
 
       const uint32_t requestSize = m_httpVariables->GetRequestSize ();
       Ptr<Packet> packet = Create<Packet> (requestSize);
@@ -500,6 +505,11 @@ ThreeGppHttpClient::RequestEmbeddedObject ()
           header.SetContentLength (0); // Request does not need any content length.
           header.SetContentType (ThreeGppHttpHeader::EMBEDDED_OBJECT);
           header.SetClientTs (Simulator::Now ());
+          //akhila
+          m_objectClientTs = Simulator::Now ();
+          /*std::cout << "Debug: " << "RequestEmbeddedObject " 
+              << "m_objectClientTs being set to " << m_objectClientTs.GetMicroSeconds()
+              << std::endl;*/
 
           const uint32_t requestSize = m_httpVariables->GetRequestSize ();
           Ptr<Packet> packet = Create<Packet> (requestSize);
@@ -582,7 +592,13 @@ ThreeGppHttpClient::ReceiveMainObject (Ptr<Packet> packet, const Address &from)
 
           if (!m_objectClientTs.IsZero ())
             {
+	      //akhila
               m_rxRttTrace (m_webpageCounter, "main", Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
+              /*std::cout << "Debug: " << "ReceiveMainObject " 
+              << "Time now is " << Simulator::Now ().GetMicroSeconds()
+              << " Time of request was " <<  m_objectClientTs.GetMicroSeconds()
+              << " RxDelay is " << (Simulator::Now () - m_objectClientTs).GetMicroSeconds()
+              << std::endl;*/
               m_objectClientTs = MilliSeconds (0); // Reset back to zero.
             }
 
@@ -643,7 +659,13 @@ ThreeGppHttpClient::ReceiveEmbeddedObject (Ptr<Packet> packet, const Address &fr
 
           if (!m_objectClientTs.IsZero ())
             {
+	      //akhila
               m_rxRttTrace (m_webpageCounter, "embedded", Simulator::Now () - m_objectClientTs, from, m_constructedPacket->GetSize());
+            /*std::cout << "Debug: " << "ReceiveEmbeddedObject " 
+              << "Time now is " << Simulator::Now ().GetMicroSeconds()
+              << " Time of request was " <<  m_objectClientTs.GetMicroSeconds()
+              << " RxDelay is " << (Simulator::Now () - m_objectClientTs).GetMicroSeconds()
+              << std::endl;*/
               m_objectClientTs = MilliSeconds (0); // Reset back to zero.
             }
 
@@ -697,7 +719,11 @@ ThreeGppHttpClient::Receive (Ptr<Packet> packet)
       packet->RemoveHeader (httpHeader);
 
       m_objectBytesToBeReceived = httpHeader.GetContentLength ();
-      m_objectClientTs = httpHeader.GetClientTs ();
+      
+      //akhila 
+      // I set it in request object
+      //m_objectClientTs = httpHeader.GetClientTs ();
+      
       m_objectServerTs = httpHeader.GetServerTs ();
 
       // Take a copy for constructed packet trace. Note that header is included.
