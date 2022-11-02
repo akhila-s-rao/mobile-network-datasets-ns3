@@ -28,11 +28,9 @@ Several components will not be configured and be shown in red. This is normal.
 ## Step 5: Create a folder to store your logs
 mkdir logs
  
-## Step 6: Run the 5G hexagonal tesselation topology mobile network example 
-./waf --cwd="logs" --run "lena-lte-comparison-user --scenario=UMi --numRings=1 --ueNumPergNb=30 --appGenerationTime=10000 --numerologyBwp=0 --simulator=5GLENA --trafficScenario=0 --randomSeed=1"
-
-
-
-
+## Step 6: Tune parameter knobs, modify the simulation scenario setup and run a simulation campaign through   
+cd mobile-network-datasets-ns3/ns-3-dev/src/nr/examples/dataset_gen_scripts 
+edit run_script.sh as required
+bash run_script.sh 
 
 ### Curated datasets genrated from these scripts can be found at (add google drive link) 
