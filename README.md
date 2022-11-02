@@ -1,5 +1,7 @@
 # mobile-network-datasets-ns3
-This project contains scripts to generate datasets from 4G and 5G mobile networks. It comes packaged with the base ns-3 module along with additional third party ns-3 modules that are required to generate diverse datasets. 
+This project contains scripts to generate datasets from ns-3 4G and 5G mobile networks. It comes packaged with the base ns-3 module along with additional third party ns-3 modules that are required to generate diverse datasets. 
+
+It also contains scripts to parse the data, do sanity checks on them and visualize it in various ways.  
 
 # Install instructions
 This is a full ns-3 installation along with the additional modules and changes to the base code. 
