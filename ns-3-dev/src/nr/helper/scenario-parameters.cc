@@ -106,7 +106,10 @@ ScenarioParameters::SetUMaParameters (void)
 void
 ScenarioParameters::SetUMiParameters (void)
 {
-  m_isd = 500;
+  //m_isd = 500;
+    // akhila
+    // WARNING
+  m_isd = 200;
   m_bsHeight = 10.0;
   m_utHeight = 1.5;
   m_sectorization = SiteSectorizationType::TRIPLE;

@@ -119,7 +119,10 @@ main (int argc, char *argv[])
                 params.traceHttp);
     cmd.AddValue ("appVr",
                 "Install the virtual reality (VR) streaming application",
-                params.traceUlThput);
+                params.traceVr);
+    cmd.AddValue ("numVrUes",
+                "Number of UEs that have the VR app installed on them",
+                params.numVrUes);
     cmd.AddValue ("appFlow",
                 "Install the uplink and downlink UDP flow generation application",
                 params.traceFlow);

@@ -21,6 +21,7 @@
 #include <ns3/nstime.h>
 #include <string>
 #include <ostream>
+#include<cmath>
 
 #include <filesystem>
 
@@ -85,21 +86,24 @@ void CellularNetwork (const Parameters &params){
     // To prevent the should trigger HO Preparation Failure, but it is not implemented ASSERT
     Config::SetDefault ("ns3::LteEnbMac::NumberOfRaPreambles", UintegerValue (40));
     // Default values for the simulation. 
-    Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (320));
+    // This number must be larger than the max number of UEs that could be connected to a BS
+    // There is a mismatch in how this attribute is presented versus how it works. 
+    // The UeSinrSamplePeriod and InterferenceSamplePeriod from LteEnbPhy are multiplied by this SrsPeriodicity
+    // because I guess they are measured on every srsReport. So make to account for this when you set the logging period   
+    Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (40));// 320 is max {0, 2, 5, 10, 20, 40,  80, 160, 320}
     //Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
     Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
 
     // Set time granularity for RAN traces that are periodic
     Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
-    Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
-    Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
+    Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (1)); // The real sample period is multiplied by ns3::LteEnbRrc::SrsPeriodicity
+    Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (1)); // The real sample period is multiplied by ns3::LteEnbRrc::SrsPeriodicity
 
-    // This is set in the lte-utils (not nr-utils) 
+    // This is set in the lte-utils (not nr-utils however) 
     //Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (10 * 1024)); //default is 10240 
 
     Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (params.tcpSndRcvBuf));// default is 131072
     Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (params.tcpSndRcvBuf));// default is 131072
-
    
     // Need to increase size from default for larger webpages.  
     Config::SetDefault ("ns3::ThreeGppHttpVariables::MainObjectSizeMean", UintegerValue (params.httpMainObjMean));
@@ -143,7 +147,7 @@ void CellularNetwork (const Parameters &params){
     
     /*** HexagonalGridScenarioHelper ***/
     // Sets the locations of base stations for a hex topology 
-    // Ingerits from NodeDistributionScenarioInterface
+    // Inherits from NodeDistributionScenarioInterface
     HexagonalGridScenarioHelper gridScenario;
 
     gridScenario.SetScenarioParameters (scenarioParams);
@@ -276,13 +280,16 @@ void CellularNetwork (const Parameters &params){
     for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
     {
         Ptr<Node> node = ueNodes.Get (ueId);
-        if ( ueId < params.fracFastUes*ueNodes.GetN () ) 
+        //The first few UeIds are the fast moving ones 
+        if ( ueId < floor(params.fracFastUes*ueNodes.GetN ()) ) 
         {
             // fast moving 
             mobility.SetMobilityModel ("ns3::SteadyStateRandomWaypointMobilityModel", 
                                        "MaxSpeed", DoubleValue (params.fastUeMaxSpeed), 
                                        "MinSpeed", DoubleValue (params.fastUeMinSpeed) );
             mobility.Install(node);
+            // save list of UE IDs that are fast moving for later use 
+            fastUes.push_back (ueId);
         }
         else
         {
@@ -815,6 +822,43 @@ void CellularNetwork (const Parameters &params){
         }
         
         
+        if (params.traceVr) 
+        {
+          // Install VR app on the last n UEs whihc are slow moving UEs 
+            if (ueId >= (ueNodes.GetN ()-params.numVrUes) )
+            {
+                //Install VR and continue so that the regular logic is not encountered
+                // Iterate over the UEs that are selected to have a VR app on them 
+                // These UEs are slow moving UEs close to micro layer BSs with their higher BW
+                //for (uint32_t ueId = 0; ueId < 0; ++ueId)
+                //{
+                //Ptr<Node> node = ueNodes.Get (ueId);
+                //Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
+                //Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+                //Ipv4Address addr = iaddr.GetLocal ();
+
+                // Random sample for the start time fo the VR session for each UE  
+                double vrStartTime = vrStart->GetValue();
+                // The sender of VR traffic to be installed on remoteHost
+                BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
+                                           InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
+                burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
+                burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
+                                                "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
+                                                "StartTime", DoubleValue (vrStartTime));
+                vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
+                serverApps.Add (burstyHelper.Install (remoteHost));
+                // The receiver of the VR traffic to be installed on UEs
+                clientApps.Add (burstSinkHelper.Install (node));
+                // Print the IMSI of the ues that are doing this	
+                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                    << " Ip_addr: " << addr 
+                    << " has VR app installed " << std::endl;
+                //}
+                continue;
+            }
+        }
+        
         // These are the apps that are on a subset of devices 
         if (ueId % 5 == 0)
         {
@@ -894,7 +938,7 @@ void CellularNetwork (const Parameters &params){
         }
     } // end of for over UEs
     
-    if(params.traceVr)
+/*    if(params.traceVr)
     {
         // Iterate over the UEs that are selected to have a VR app on them 
         // These UEs are slow moving UEs close to micro layer BSs with their higher BW
@@ -923,7 +967,7 @@ void CellularNetwork (const Parameters &params){
                 << " Ip_addr: " << addr 
                 << " has VR app installed " << std::endl;
         }
-    }
+    }*/
 
 
     // Server Start  

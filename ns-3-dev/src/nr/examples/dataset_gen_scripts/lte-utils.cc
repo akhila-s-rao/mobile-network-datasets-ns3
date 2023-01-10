@@ -128,7 +128,9 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
     }
 
   double txPower;
-  double ueTxPower = 23;
+    //akhila
+    //WARNING
+  double ueTxPower = 23; //23
   std::string pathlossModel;
   if (params.scenario == "UMa")
     {
@@ -139,6 +141,10 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
     {
       txPower = 30;
       pathlossModel = "ns3::ThreeGppUmiStreetCanyonPropagationLossModel";
+      //WARNING
+      //pathlossModel = "ns3::ThreeGppUmaPropagationLossModel";
+      //Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue(300));
+      //pathlossModel = "ns3::RangePropagationLossModel";
     }
   else if (params.scenario == "RMa")
     {
@@ -170,17 +176,17 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   {
       lteHelper->SetHandoverAlgorithmType ("ns3::A3RsrpHandoverAlgorithm");
       lteHelper->SetHandoverAlgorithmAttribute ("Hysteresis", 
-                                                DoubleValue (3.0)); // used to be 3
+                                                DoubleValue (3.0)); // default value 3
       lteHelper->SetHandoverAlgorithmAttribute ("TimeToTrigger",
-                                              TimeValue (MilliSeconds (256))); // used to be 256 
+                                              TimeValue (MilliSeconds (256))); // default value 256 
   }
     else if (params.handoverAlgo == "A2A4Rsrq")
     {
         lteHelper->SetHandoverAlgorithmType ("ns3::A2A4RsrqHandoverAlgorithm");
         lteHelper->SetHandoverAlgorithmAttribute ("ServingCellThreshold",
-                                            UintegerValue (30));
+                                            UintegerValue (30));//30
         lteHelper->SetHandoverAlgorithmAttribute ("NeighbourCellOffset",
-                                            UintegerValue (1));
+                                            UintegerValue (1));// 1
     }
 
   lteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
@@ -197,8 +203,8 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   Config::SetDefault ("ns3::LteUePhy::EnableUplinkPowerControl", BooleanValue (params.enableUlPc));
 
   lteHelper->SetEnbAntennaModelType ("ns3::CosineAntennaModel");
-  lteHelper->SetEnbAntennaModelAttribute ("HorizontalBeamwidth", DoubleValue (130));
-  lteHelper->SetEnbAntennaModelAttribute ("MaxGain", DoubleValue (0));
+  lteHelper->SetEnbAntennaModelAttribute ("HorizontalBeamwidth", DoubleValue (120)); // used to be 130
+  lteHelper->SetEnbAntennaModelAttribute ("MaxGain", DoubleValue (0));// used to be 0
   lteHelper->SetEnbDeviceAttribute ("DlBandwidth", UintegerValue (bandwidthBandDlRB));
   lteHelper->SetEnbDeviceAttribute ("UlBandwidth", UintegerValue (bandwidthBandUlRB));
 

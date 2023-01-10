@@ -79,7 +79,7 @@ struct Parameters
     Time appStartTime = MilliSeconds (500);
     Time progressInterval = Seconds (1);
     uint32_t randSeed = 13;
-    uint16_t ranSamplePeriodMilli = 20;  
+    uint16_t ranSamplePeriodMilli = 40;  
         
 
     // RAN parameters
@@ -95,15 +95,17 @@ struct Parameters
     std::string scheduler = "PF";
     uint32_t freqScenario = 1; // 0->non-overlaping 1->overlapping
     double downtiltAngle = 0;
-    std::string handoverAlgo = "A3Rsrp"; // Options are "A3Rsrp" or "A2A4Rsrq"
+    std::string handoverAlgo = "A2A4Rsrq"; // Options are "A3Rsrp" or "A2A4Rsrq"
     uint32_t manualHoTriggerTime = 256 ;// milliSeconds 
     bool macroMicroSharedSpectrum = true;
     // This needs to be adjusted according to data bandwidth, or one will not be able to use the full BW of the RAN 
-    uint32_t rlcUmTxBuffSize = 100*1024;  
+    uint32_t rlcUmTxBuffSize = 100*1024; //ns3 default is 10240 which is too small and restricts bandwidth 
+                                         //especially VR which pushed a very large frame to the buffer all at once  
     
     // network parameters
     
-    uint32_t tcpSndRcvBuf = 1000*1024;  
+    uint32_t tcpSndRcvBuf = 1000*1024;  // ns3 default is 131072 which is too small and restricts bandwidth 
+                                        //especially VR which pushed a very large frame to the buffer all at once
     
     // mobility model 
     
@@ -130,6 +132,7 @@ struct Parameters
     bool traceFlow = false;
     
     // VR
+    uint16_t numVrUes = 1;
     double vrStartTimeMin = 2; // seconds 
     double vrStartTimeMax = 5; // seconds
     

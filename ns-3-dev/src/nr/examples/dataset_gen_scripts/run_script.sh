@@ -2,6 +2,10 @@
 pkill ns3.35-cellular
 sleep 1
 
+# debug mode runs using gdb. Make sure to set the particular run number you want 
+# (probably the one that crashed the quickest)
+debug_mode=0
+
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
 num_sim_campaigns=1
@@ -29,9 +33,16 @@ mkdir "$data_dir1/$script_save_dir_name"
 cp -r "$run_script_loc/"* "$data_dir1/$script_save_dir_name/."
 
 
-#len=10
-len=1
-#i=3
+
+len=10
+seed_shifter=0
+
+if [ $debug_mode -eq 1 ]
+then
+  len=1
+  #i=3
+fi
+
 for (( i=0; i<$len; i++ ))
 do
   cmd_args="cellular-network-user \
@@ -40,27 +51,34 @@ do
        --ueNumPergNb=1 \
        --useMicroLayer=false \
 	   --numMicroCells=3 \
-	   --appGenerationTime=100 \
+	   --appGenerationTime=200 \
 	   --rat=LTE \
 	   --operationMode=FDD \
-       --appDlThput=true \
-       --randomSeed=$i"
+       --appDlThput=false \
+       --appUlThput=false \
+       --appHttp=true \
+       --appDash=true \
+       --appVr=false \
+       --numVrUes=2 \
+       --randomSeed=$(($i + $seed_shifter))"
 
   run_dir="run$(($i + 1))"  
   mkdir "$data_dir1/$run_dir"
 
-  # Run 
-  taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" \
-    > "$data_dir1/$run_dir/simulation_info.txt" & #\
-    #2> "$data_dir1/$run_dir/stderr_log.txt" &
-
-  # Run with gdb debug mode 
-  #./waf --gdb --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" 
-  #> "$data_dir1/$run_dir/console_log.txt"
-
-  # Run with valgring debug mode
-  #./waf --valgrind --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir"
-  #./waf --run --command-template="valgrind --leak-check=full --show-reachable=yes %s" "$cmd_args --cwd=$data_dir1/$run_dir"
+  # Run in debug mode 
+  if [ $debug_mode -eq 1 ]
+  then
+    # Run with gdb debug mode 
+    ./waf --gdb --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" 
+    > "$data_dir1/$run_dir/simulation_info.txt"
+    # Run with valgring debug mode
+    #./waf --valgrind --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir"
+    #./waf --run --command-template="valgrind --leak-check=full --show-reachable=yes %s" "$cmd_args --cwd=$data_dir1/$run_dir"
+  else # Run
+    taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" \
+      > "$data_dir1/$run_dir/simulation_info.txt" & #\
+      #2> "$data_dir1/$run_dir/stderr_log.txt" &
+  fi
 
   echo "Started run $(($i + 1))" 
   sleep 2
@@ -78,7 +96,8 @@ then
 echo "SECOND SET OF RUNS"
 
 # The location for saving data relative to ns-3-dev
-data_dir2="../../data_volume/lte_21macro_21Ue_delay_rtt_1Ue_ulThput" 
+#data_dir2="../../data_volume/lte_21macro_21Ue_delay_rtt_1Ue_ulThput" 
+data_dir2="../../data_volume/logs2"
 mkdir $data_dir2
 # Saving all scripts and code used for this set of simulation runs
 echo "Saving all scripts and code used for this set of simulation runs in $data_dir2"
@@ -87,20 +106,26 @@ mkdir "$data_dir2/$script_save_dir_name"
 cp -r "$run_script_loc/"* "$data_dir2/$script_save_dir_name/."
 
 len=10
+seed_shifter=0
 #i=3
 for (( i=0; i<$len; i++ ))
 do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
-	   --numRings=1 \
+	   --numRings=0 \
        --ueNumPergNb=1 \
        --useMicroLayer=false \
 	   --numMicroCells=3 \
-	   --appGenerationTime=500 \
+	   --appGenerationTime=200 \
 	   --rat=LTE \
 	   --operationMode=FDD \
+       --appDlThput=false \
        --appUlThput=false \
-       --randomSeed=$i"
+       --appHttp=false \
+       --appDash=false \
+       --appVr=false \
+       --numVrUes=1 \
+       --randomSeed=$(($i + $seed_shifter))"
 
   run_dir="run$(($i + 1))"  
   mkdir "$data_dir2/$run_dir"

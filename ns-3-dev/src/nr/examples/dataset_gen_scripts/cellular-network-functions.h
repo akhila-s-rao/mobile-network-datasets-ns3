@@ -76,6 +76,17 @@ Ptr<OutputStreamWrapper> fragmentRxStream;
 Ptr<OutputStreamWrapper> burstRxStream;   
 Ptr<OutputStreamWrapper> handoverStream;
 Ptr<OutputStreamWrapper> thputStream;
+
+// Save the ueIds as part of the different groups they are part of 
+// fast moving ueIds // no need to do slow since we have alist of all Ids
+std::vector<uint32_t> fastUes;
+std::vector<uint32_t> dashAppUes;
+std::vector<uint32_t> vrAppUes;
+std::vector<uint32_t> httpAppUes;
+std::vector<uint32_t> onlyDelayUes;
+
+    
+    
 /***************************
  * Structure Definitions
  ***************************/
@@ -419,9 +430,24 @@ ScenarioInfo (NodeDistributionScenarioInterface* scenario)
               //<< "   distance to gnb " << distance << " meters"
               << std::endl;
       }
+  }  
+  std::cout << "\n";  
+  //list all the fast UEs
+  std::cout << "Fast moving UeIds" << std::endl;
+  for(std::vector<uint32_t>::iterator iter = fastUes.begin(); iter < fastUes.end(); iter++)
+  {
+    if (global_params.rat == "NR"){
+      Ptr<Node> ue_node = ueNodes.Get (*iter);
+      Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
+      std::cout <<"UE ID: " << *iter << "  UE IMSI: " << uedev->GetImsi () << "\n";
+    }
+    else if (global_params.rat == "LTE"){
+      Ptr<Node> ue_node = ueNodes.Get (*iter);
+      Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
+      std::cout <<"UE ID: " << *iter << "  UE IMSI: " << uedev->GetImsi () << "\n";
+    }
   }
-  std::cout << "\n";   
-
+  std::cout << "\n";
 }
     
     
@@ -602,8 +628,8 @@ ThputMeasurement (Ptr<OutputStreamWrapper> stream, std::string context,
           << Simulator::Now ().GetMicroSeconds ()
          << "\t" << InetSocketAddress::ConvertFrom (from).GetIpv4 ()
          << "\t" << InetSocketAddress::ConvertFrom (to).GetIpv4 ()     
-         << "\t" << p->GetSize () // received size
-         << "\t" << header.GetSize () // received size    
+         //<< "\t" << p->GetSize () // received packet size 
+         << "\t" << header.GetSize () // received packet size with header    
          << "\t" << header.GetSeq () //current sequence number
          << "\t" << header.GetTs ().GetMicroSeconds ()
          << "\t" << (Simulator::Now () - header.GetTs ()).GetMicroSeconds ()
@@ -1052,7 +1078,7 @@ void CreateTraceFiles (void)
     handoverStream = traceHelper.CreateFileStream ("handover_trace.txt");
     *handoverStream->GetStream()
           << "tstamp_us\t" << "IMSI\t" 
-          << "currentCellId\t" << "targetCellId\t" << std::endl;
+          << "cellId\t" << "targetCellId" << std::endl;
     topologyStream = traceHelper.CreateFileStream ("gnb_locations.txt"); 
     if(global_params.traceDelay)
     {
@@ -1129,8 +1155,8 @@ void CreateTraceFiles (void)
         
         *thputStream->GetStream()
             << "tstamp_us\t" << "fromAddr\t" << "toAddr\t" 
-            << "pktSize\t" << "pktSize\t" 
-            << "seqNum\t" << "txTstamp_us\t" << "delay\t" << std::endl;
+            << "pktSize\t" 
+            << "seqNum\t" << "txTstamp_us\t" << "delay" << std::endl;
     }
 }    
     
@@ -1160,7 +1186,7 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
         MSG ("Macro layer BS positions") << "Regular hexaonal lay down";
         MSG ("Macro layer num of rings") << p.numOuterRings;
         MSG ("Macro layer num of BSs") << macroLayerGnbNodes.GetN();
-        MSG ("Micro layer BS antenna pattern") << "Cosine 130 degrees";
+        MSG ("Micro layer BS antenna pattern") << "Cosine 120 degrees";
         MSG ("Micro layer of BSs") << (p.useMicroLayer ? "Enabled" : "Disabled");
         if (p.useMicroLayer)
         {
