@@ -1,5 +1,7 @@
 # mobile-network-datasets-ns3
-This project contains scripts to generate datasets from 4G and 5G mobile networks. It comes packaged with the base ns-3 module along with additional third party ns-3 modules that are required to generate diverse datasets. 
+This project contains scripts to generate datasets from ns-3 4G and 5G mobile networks. It comes packaged with the base ns-3 module along with additional third party ns-3 modules that are required to generate diverse datasets. 
+
+It also contains scripts to parse the data, do sanity checks on them and visualize it in various ways.  
 
 # Install instructions
 This is a full ns-3 installation along with the additional modules and changes to the base code. 
@@ -26,11 +28,9 @@ Several components will not be configured and be shown in red. This is normal.
 ## Step 5: Create a folder to store your logs
 mkdir logs
  
-## Step 6: Run the 5G hexagonal tesselation topology mobile network example 
-./waf --cwd="logs" --run "lena-lte-comparison-user --scenario=UMi --numRings=1 --ueNumPergNb=30 --appGenerationTime=10000 --numerologyBwp=0 --simulator=5GLENA --trafficScenario=0 --randomSeed=1"
-
-
-
-
+## Step 6: Tune parameter knobs, modify the simulation scenario setup and run a simulation campaign through   
+cd mobile-network-datasets-ns3/ns-3-dev/src/nr/examples/dataset_gen_scripts 
+edit run_script.sh as required
+bash run_script.sh 
 
 ### Curated datasets genrated from these scripts can be found at (add google drive link) 
