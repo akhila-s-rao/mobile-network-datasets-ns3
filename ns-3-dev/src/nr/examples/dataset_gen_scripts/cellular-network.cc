@@ -90,7 +90,7 @@ void CellularNetwork (const Parameters &params){
     // There is a mismatch in how this attribute is presented versus how it works. 
     // The UeSinrSamplePeriod and InterferenceSamplePeriod from LteEnbPhy are multiplied by this SrsPeriodicity
     // because I guess they are measured on every srsReport. So make to account for this when you set the logging period   
-    Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (40));// 320 is max {0, 2, 5, 10, 20, 40,  80, 160, 320}
+    Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (80));// 320 is max {0, 2, 5, 10, 20, 40,  80, 160, 320}
     //Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
     Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
 
@@ -161,8 +161,13 @@ void CellularNetwork (const Parameters &params){
     else
         ueNum = params.ueNumPergNb * gnbSites * sectors;
     
+    //WARNING
+    //ueNum = 1;
+  
+  
     gridScenario.SetUtNumber (ueNum);
     sector0AngleRad = gridScenario.GetAntennaOrientationRadians (0);
+    std::cout << "sector0AngleRad: " << sector0AngleRad << std::endl;
 
     // Creates and plots the network deployment and assigns gnb and ue containers
     gridScenario.CreateScenario ();
@@ -225,10 +230,10 @@ void CellularNetwork (const Parameters &params){
 
     // Add the cell width to the min and max boundaries to create the bounding box
     double hexCellRadius = gridScenario.GetHexagonalCellRadius();
-    boundingBoxMinX = boundingBoxMinX - hexCellRadius;
-    boundingBoxMinY = boundingBoxMinY - hexCellRadius;
-    boundingBoxMaxX = boundingBoxMaxX + hexCellRadius;
-    boundingBoxMaxY = boundingBoxMaxY + hexCellRadius;
+    boundingBoxMinX = boundingBoxMinX - sqrt(2)*hexCellRadius;
+    boundingBoxMinY = boundingBoxMinY - sqrt(2)*hexCellRadius;
+    boundingBoxMaxX = boundingBoxMaxX + sqrt(2)*hexCellRadius;
+    boundingBoxMaxY = boundingBoxMaxY + sqrt(2)*hexCellRadius;
     std::cout << "Topology Bounding box (x,y): "
             << "(" << boundingBoxMinX << ", " << boundingBoxMinY << ")  "
             << "(" << boundingBoxMinX << ", " << boundingBoxMaxY << ")  "
@@ -281,7 +286,7 @@ void CellularNetwork (const Parameters &params){
     {
         Ptr<Node> node = ueNodes.Get (ueId);
         //The first few UeIds are the fast moving ones 
-        if ( ueId < floor(params.fracFastUes*ueNodes.GetN ()) ) 
+        if ( ueId < (params.fracFastUes*ueNodes.GetN ()) ) // use floor(params.fracFastUes*ueNodes.GetN ()) to allow only slow in 3 UE case 
         {
             // fast moving 
             mobility.SetMobilityModel ("ns3::SteadyStateRandomWaypointMobilityModel", 
@@ -377,13 +382,27 @@ void CellularNetwork (const Parameters &params){
         /*************************************************************************
         ************************* Micro layer********************************
         **************************************************************************/    
+        // Create random initial position allocator for UEs within this box
+        Ptr<PositionAllocator> microPositionAlloc = CreateObject<RandomBoxPositionAllocator> ();
+        Ptr<UniformRandomVariable> xPos = CreateObject<UniformRandomVariable> ();
+        xPos->SetAttribute ("Min", DoubleValue (boundingBoxMinX));
+        xPos->SetAttribute ("Max", DoubleValue (boundingBoxMaxX));
+        microPositionAlloc->SetAttribute ("X", PointerValue (xPos));
+        Ptr<UniformRandomVariable> yPos = CreateObject<UniformRandomVariable> ();
+        yPos->SetAttribute ("Min", DoubleValue (boundingBoxMinY));
+        yPos->SetAttribute ("Max", DoubleValue (boundingBoxMaxY));
+        microPositionAlloc->SetAttribute ("Y", PointerValue (yPos));
+        Ptr<ConstantRandomVariable> zPos = CreateObject<ConstantRandomVariable> ();
+        // make this a parameter and set it in the .h file
+        zPos->SetAttribute ("Constant", DoubleValue (7.0));
+        microPositionAlloc->SetAttribute ("Z", PointerValue (zPos));
 
         microLayerGnbNodes.Create(params.numMicroCells); 
         MobilityHelper microGnbMobility;
         microGnbMobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
         // reusing the same position allocator as the one used for UEs 
         // since the bounding box is the same 
-        microGnbMobility.SetPositionAllocator (positionAlloc);
+        microGnbMobility.SetPositionAllocator (microPositionAlloc);
         microGnbMobility.Install (microLayerGnbNodes);
 
         // I could also just use the same lte helper we had before since 
@@ -587,7 +606,7 @@ void CellularNetwork (const Parameters &params){
     uint16_t dashPortNum = 15000;
     uint16_t vrPortNum = 16000;
 
-    uint32_t echoPacketCount = 0xFFFFFFFF; 
+    uint32_t echoPacketCount = 0xFFFFFFFF;
     uint32_t delayPacketCount = 0xFFFFFFFF; 
     uint32_t flowPacketCount = 0xFFFFFFFF;
 
@@ -1093,6 +1112,26 @@ void CellularNetwork (const Parameters &params){
         Simulator::Schedule (MilliSeconds(params.manualHoTriggerTime), &CheckForManualHandovers, lteHelper); 
     }*/
     
+   
+    /*
+    // REM map which is a plot of the DL SINR over the coverage region
+    //Ptr<NrRadioEnvironmentMapHelper> remHelper = CreateObject<NrRadioEnvironmentMapHelper> ();
+    Ptr<RadioEnvironmentMapHelper> remHelper = CreateObject<RadioEnvironmentMapHelper> ();
+    remHelper->SetAttribute("Channel", PointerValue(lteHelper->GetDownlinkSpectrumChannel())); 
+    //remHelper->SetAttribute("Channel", PointerValue(lteHelper->GetUplinkSpectrumChannel())); 
+    //remHelper->SetAttribute ("ChannelPath", StringValue ("/ChannelList/3"));  
+    remHelper->SetAttribute ("Earfcn", UintegerValue(100));//100 default
+    remHelper->SetAttribute ("Bandwidth", UintegerValue(50));//PRBs  
+    remHelper->SetAttribute ("OutputFile", StringValue ("rem.out"));
+    remHelper->SetAttribute ("XMin", DoubleValue (boundingBoxMinX));
+    remHelper->SetAttribute ("XMax", DoubleValue (boundingBoxMaxX));
+    remHelper->SetAttribute ("YMin", DoubleValue (boundingBoxMinY));
+    remHelper->SetAttribute ("YMax", DoubleValue (boundingBoxMaxY));
+    remHelper->SetAttribute ("Z", DoubleValue (1.5));
+    remHelper->SetAttribute("UseDataChannel", BooleanValue(true));
+    remHelper->Install ();
+    //remHelper->CreateRem (remNd, remDevice, remPhyIndex);*/
+  
     Simulator::Run ();
     std::cout << "\n------------------------------------------------------\n"
             << "End simulation"

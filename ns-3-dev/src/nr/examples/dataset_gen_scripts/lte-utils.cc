@@ -130,7 +130,7 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   double txPower;
     //akhila
     //WARNING
-  double ueTxPower = 23; //23
+  double ueTxPower = 10; //23
   std::string pathlossModel;
   if (params.scenario == "UMa")
     {
@@ -142,8 +142,8 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
       txPower = 30;
       pathlossModel = "ns3::ThreeGppUmiStreetCanyonPropagationLossModel";
       //WARNING
-      //pathlossModel = "ns3::ThreeGppUmaPropagationLossModel";
-      //Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue(300));
+      //pathlossModel = "ns3::ThreeGppRmaPropagationLossModel";
+      //Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue(200));
       //pathlossModel = "ns3::RangePropagationLossModel";
     }
   else if (params.scenario == "RMa")
@@ -172,6 +172,9 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   //Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
   lteHelper->SetAttribute ("PathlossModel", StringValue (pathlossModel)); // for each band the same pathloss model
   
+  //WARNING: should be enabled
+  lteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
+  
   if (params.handoverAlgo == "A3Rsrp") 
   {
       lteHelper->SetHandoverAlgorithmType ("ns3::A3RsrpHandoverAlgorithm");
@@ -189,7 +192,7 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
                                             UintegerValue (1));// 1
     }
 
-  lteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
+  
 
   if (params.scheduler == "PF")
     {
@@ -203,8 +206,8 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   Config::SetDefault ("ns3::LteUePhy::EnableUplinkPowerControl", BooleanValue (params.enableUlPc));
 
   lteHelper->SetEnbAntennaModelType ("ns3::CosineAntennaModel");
-  lteHelper->SetEnbAntennaModelAttribute ("HorizontalBeamwidth", DoubleValue (120)); // used to be 130
-  lteHelper->SetEnbAntennaModelAttribute ("MaxGain", DoubleValue (0));// used to be 0
+  lteHelper->SetEnbAntennaModelAttribute ("HorizontalBeamwidth", DoubleValue (60)); // used to be 130
+  lteHelper->SetEnbAntennaModelAttribute ("MaxGain", DoubleValue (3));// used to be 0
   lteHelper->SetEnbDeviceAttribute ("DlBandwidth", UintegerValue (bandwidthBandDlRB));
   lteHelper->SetEnbDeviceAttribute ("UlBandwidth", UintegerValue (bandwidthBandUlRB));
 
@@ -212,6 +215,7 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   //SECTOR 1 eNB configuration
   orientationDegrees = sector0AngleRad * 180.0 / M_PI;
   lteHelper->SetEnbAntennaModelAttribute ("Orientation", DoubleValue (orientationDegrees));
+  std::cout << "Sector 1 antenna orientation wrt x axis: " << orientationDegrees << " degrees" << std::endl;
   
   lteHelper->SetEnbDeviceAttribute ("DlEarfcn", UintegerValue (centralFrequencyBand0Dl));
   lteHelper->SetEnbDeviceAttribute ("UlEarfcn", UintegerValue (centralFrequencyBand0Ul));
@@ -220,7 +224,8 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   //SECTOR 2 eNB configuration
   orientationDegrees = sector0AngleRad * 180.0 / M_PI + 120;
   lteHelper->SetEnbAntennaModelAttribute ("Orientation", DoubleValue (orientationDegrees));
-
+  std::cout << "Sector 2 antenna orientation wrt x axis: " << orientationDegrees << " degrees" << std::endl;
+  
   lteHelper->SetEnbDeviceAttribute ("DlEarfcn", UintegerValue (centralFrequencyBand1Dl));
   lteHelper->SetEnbDeviceAttribute ("UlEarfcn", UintegerValue (centralFrequencyBand1Ul));
   enbSector2NetDev = lteHelper->InstallEnbDevice (enbSector2Container);
@@ -228,6 +233,8 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   //SECTOR 3 eNB configuration
   orientationDegrees = sector0AngleRad * 180.0 / M_PI - 120;
   lteHelper->SetEnbAntennaModelAttribute ("Orientation", DoubleValue (orientationDegrees));
+  std::cout << "Sector 3 antenna orientation wrt x axis: " << orientationDegrees << " degrees" << std::endl;
+  
   lteHelper->SetEnbDeviceAttribute ("DlEarfcn", UintegerValue (centralFrequencyBand2Dl));
   lteHelper->SetEnbDeviceAttribute ("UlEarfcn", UintegerValue (centralFrequencyBand2Ul));
   enbSector3NetDev = lteHelper->InstallEnbDevice (enbSector3Container);

@@ -44,6 +44,11 @@ file_name_to_tstamp_unit = {'DlTxPhyStats.txt':'ms', 'UlRxPhyStats.txt':'ms',
                             'DlPdcpStats.txt':'s', 'DlRlcStats.txt':'s', 'DlRxPhyStats.txt':'ms', 
                             'DlMacStats.txt':'s'}
 
+# These are files that will go through the windowing process where the time slice is made uniform and all IMSIs are included 
+# Don't include files which do not have all IMSIs
+a_vs_b_files = ran_files + ['mobility_trace.txt', 'dlThroughput_trace.txt', 'ulThroughput_trace.txt', 
+                            'delay_trace.txt', 'rtt_trace.txt'] 
+
 # The internal log files do not follow a consistent naming convention for some metrics
 # and hence I need to isolate them and fix it
 files_that_use_upper_case_cellid=['UlPdcpStats.txt', 'UlRlcStats.txt', 'DlPdcpStats.txt', 'DlRlcStats.txt']
@@ -86,3 +91,14 @@ def plot_metric_vs_distance_to_cell(dist, y, colour, ylabel, plot_name, plot_dir
     plt.savefig(fname)
     plt.show()
     #wandb.log({plot_name: wandb.Image(fname)})
+    
+def plot_metric_vs_sinr(sinr, y, colour, ylabel, plot_name, plot_dir):
+    fig = plt.figure(figsize=(10,5))
+    ylimit=np.nanquantile(y,0.98)
+    plt.plot(sinr[y <= ylimit], y[y <= ylimit], '.', color=colour)
+    plt.ylim()
+    plt.xlabel('SINR'); plt.ylabel(ylabel); 
+    fname=plot_dir+plot_name
+    plt.savefig(fname)
+    plt.show()
+    #wandb.log({plot_name: wandb.Image(fname)})    

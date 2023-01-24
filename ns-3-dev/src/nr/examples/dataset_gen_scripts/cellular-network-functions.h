@@ -371,14 +371,18 @@ ScenarioInfo (NodeDistributionScenarioInterface* scenario)
     {
       Ptr<Node> gnb = allGnbNodes.Get (cellIndex);
       uint32_t cellId = 0; 
+      //double bsTxPower = 0;
       Vector gnbpos = gnb->GetObject<MobilityModel> ()->GetPosition ();
       if (global_params.rat == "NR"){
           cellId = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetCellId ();
+          //bsTxPower = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetObject<Nr>()
       }
       else if (global_params.rat == "LTE"){
           cellId = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetCellId ();
+          //bsTxPower = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetObject<LteEnbPhy>()->GetTxPower();
       }
       std::cout << "gnbNodes Index:" << cellIndex << " CellId: " << cellId << " pos: (" << gnbpos.x << ", " << gnbpos.y <<  ", " << gnbpos.z <<  ")  "
+              //<< "   BSTxPower " << bsTxPower
               << std::endl;
      *topologyStream->GetStream()
           << cellId << "," << gnbpos.x << "," << gnbpos.y <<  "," << gnbpos.z << std::endl; 
@@ -403,12 +407,14 @@ ScenarioInfo (NodeDistributionScenarioInterface* scenario)
           //Vector gnbpos = uedev->GetTargetEnb ()->GetNode() ->GetObject<MobilityModel> ()->GetPosition ();
           //double distance = CalculateDistance (gnbpos, uepos);
         
+          //const double ueTxpower = uedev->GetObject<NrUePhy> ()->GetTxPower ();
           std::cout << "NodeId "<< ue_node->GetId () 
               << "   UeIndex(ueId) " << ueId
               << "   IMSI " << uedev->GetImsi ()
               << "   cellId " << GetCellId_from_ueId (ueId)
               << "   UeIpAddr " << addr 
               << "   UePos " << uepos
+              //<< "   ueTxPower " << ueTxpower
               //<< "   distance to gnb " << distance << " meters"
               << std::endl;
       }
@@ -419,6 +425,9 @@ ScenarioInfo (NodeDistributionScenarioInterface* scenario)
           Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
           Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
           Ipv4Address addr = iaddr.GetLocal ();
+        
+          
+          //double ueTxpower = ue_node->GetDevice (0)->GetObject<LteUePhy> ()->GetTxPower ();
           //Vector gnbpos = uedev->GetTargetEnb ()->GetNode()  >GetObject<MobilityModel> ()->GetPosition ();
           //double distance = CalculateDistance (gnbpos, uepos);
           std::cout << "NodeId "<< ue_node->GetId () 
@@ -427,6 +436,7 @@ ScenarioInfo (NodeDistributionScenarioInterface* scenario)
               << "   cellId " << GetCellId_from_ueId (ueId)
               << "   UeIpAddr " << addr 
               << "   UePos " << uepos
+             // << "   ueTxPower " << ueTxpower
               //<< "   distance to gnb " << distance << " meters"
               << std::endl;
       }
@@ -1079,6 +1089,7 @@ void CreateTraceFiles (void)
     *handoverStream->GetStream()
           << "tstamp_us\t" << "IMSI\t" 
           << "cellId\t" << "targetCellId" << std::endl;
+  
     topologyStream = traceHelper.CreateFileStream ("gnb_locations.txt"); 
     if(global_params.traceDelay)
     {

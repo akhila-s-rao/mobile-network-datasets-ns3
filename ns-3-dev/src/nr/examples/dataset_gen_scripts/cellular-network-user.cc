@@ -84,6 +84,9 @@ main (int argc, char *argv[])
     cmd.AddValue ("scheduler",
                 "PF: Proportional Fair, RR: Round-Robin",
                 params.scheduler);
+    cmd.AddValue ("handoverAlgo",
+                "Set handover algorithm to use (choose between A3Rsrp and A2A4Rsrq)",
+                params.handoverAlgo);
     cmd.AddValue ("bandwidth",
                 "BW in MHz for each BWP (integer value): valid values are 20, 10, 5",
                 params.bandwidthMHz);
@@ -126,7 +129,6 @@ main (int argc, char *argv[])
     cmd.AddValue ("appFlow",
                 "Install the uplink and downlink UDP flow generation application",
                 params.traceFlow);
-
 
     // Parse the command line
     cmd.Parse (argc, argv);

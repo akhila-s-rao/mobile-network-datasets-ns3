@@ -69,3 +69,93 @@
 
 #!!!!!! But I do not know what the IMSI of these ueIds are 
 #Maybe I should create these groups in ns3 code using IMSI instead of ueId 
+
+
+
+
+Plan
+====
+Tuesday
+- Decide on parameters for the 2 scenarios and create a 200s run for each 
+- Take those graphs and put it in the paper for sizing
+- Make the plots pretty (take away space between them, adjust the axis etc.)
+- Organize and pretty up the scenario description tables
+
+Wednesday 
+- Reduce size of motivation and related work 
+- Complete the data format section
+- Write the design decisions section
+- Add the ML tasks in related wrok table
+- Read the beyond throughput paper and see what inspirations I can borrow. 
+
+Thursday 
+- Pimp up the github page and add links to the google directory with data 
+- Write about how this is useful to the multimedia community
+
+Friday 
+- Improve language 
+
+
+
+
+
+
+
+
+parameters yet to be fixed 
+==========================
+
+- DONE ueTxPower (lte-utils.cc) enableUlPc but the default value set to 10 dBm 
+-  ? macro txPower (lte-utils.cc) 30 dBm (we set it to lower than the dual-stripe scenario even though I think we have a more punishing model, is this okay ? I need to check with a REM map)
+- ? microTx power (cellular-network.h) right now it is 18dBm 
+- ? cosine antenna MaxGain (lte-utils.cc) as of now it is 3  
+- DONE handover algorithm (cellular-network.cc) A2A4Rsrq
+- DONE beamwidth for cosine antenna (lte-utils.cc) 60 degrees 
+- ? ISD 500 m depends on the Tx power set for macro Tx
+- Macro bounding box 
+- Micro bounding box
+- 
+
+
+
+
+
+Scenario 1
+==========
+Macro topology 
+5 UEs per enb no VR  
+slow and fast UEs
+
+Scenario 2
+==========
+Macro + micro topology (30 dbm for macro and 20 dBm for micro, use 10dBm for UE with auto)
+30 Ues per enb with VR 
+Slow and fast UEs
+create a bounding box around the micro enbs and make some UEs move very slow move only within it
+      - Other UEs can pass this box and connect to the micro UEs of course but there are some UEs that can be separated by IMSI that only connect with the micro UE 
+      - Micro box size would be 100 m by 100m. Don't force the UEs in the box to connecyt tp micrp. It should be decide dby handover   
+
+
+Scenario 3
+==========
+macro topology 
+Rural ISD 
+rural channel model 
+slow and fast UEs 
+
+
+compare scenario 1 and scenario 2 
+separate plots for slow and fast UEs in scenario2 
+separate plots for macro connected UEs and micro connected UEs in scenario 2
+
+
+
+
+Things I need to find out 
+=========================
+- How does the scheduler handle difference bearer types, does it do QoS based scheduling ? If not then what is the incentive for declaring bearers and not using the default bearer for all traffic streams ? 
+- 
+
+
+
+

@@ -8,7 +8,7 @@ debug_mode=0
 
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
-num_sim_campaigns=1
+num_sim_campaigns=2
 
 # Save the directory location which has the run script and the simulations script
 run_script_loc=$(pwd)
@@ -32,10 +32,8 @@ mkdir "$data_dir1/$script_save_dir_name"
 # Save all relevant scripts (this script and the ns3 scripts)
 cp -r "$run_script_loc/"* "$data_dir1/$script_save_dir_name/."
 
-
-
 len=10
-seed_shifter=0
+seed_shifter=10
 
 if [ $debug_mode -eq 1 ]
 then
@@ -48,18 +46,21 @@ do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
-       --ueNumPergNb=1 \
+       --ueNumPergNb=20 \
        --useMicroLayer=false \
 	   --numMicroCells=3 \
-	   --appGenerationTime=200 \
+	   --appGenerationTime=100 \
 	   --rat=LTE \
 	   --operationMode=FDD \
+       --handoverAlgo=A2A4Rsrq \
+       --enableUlPc=true \
        --appDlThput=false \
        --appUlThput=false \
-       --appHttp=true \
-       --appDash=true \
+       --appHttp=false \
+       --appDash=false \
        --appVr=false \
-       --numVrUes=2 \
+       --numVrUes=1 \
+       --freqScenario=1 \
        --randomSeed=$(($i + $seed_shifter))"
 
   run_dir="run$(($i + 1))"  
@@ -106,25 +107,28 @@ mkdir "$data_dir2/$script_save_dir_name"
 cp -r "$run_script_loc/"* "$data_dir2/$script_save_dir_name/."
 
 len=10
-seed_shifter=0
+seed_shifter=10
 #i=3
 for (( i=0; i<$len; i++ ))
 do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
-       --ueNumPergNb=1 \
+       --ueNumPergNb=30 \
        --useMicroLayer=false \
 	   --numMicroCells=3 \
-	   --appGenerationTime=200 \
+	   --appGenerationTime=100 \
 	   --rat=LTE \
 	   --operationMode=FDD \
+       --handoverAlgo=A2A4Rsrq \
+       --enableUlPc=true \
        --appDlThput=false \
        --appUlThput=false \
        --appHttp=false \
        --appDash=false \
        --appVr=false \
        --numVrUes=1 \
+       --freqScenario=1 \
        --randomSeed=$(($i + $seed_shifter))"
 
   run_dir="run$(($i + 1))"  

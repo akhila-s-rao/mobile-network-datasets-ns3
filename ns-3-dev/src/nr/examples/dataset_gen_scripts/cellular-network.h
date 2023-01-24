@@ -60,8 +60,8 @@ struct Parameters
     uint16_t ueNumPergNb = 3;
     std::string rat = "LTE";
     std::string scenario = "UMi";
-    uint16_t numMicroCells = 21;
-    uint16_t microCellTxPower = 30;
+    uint16_t numMicroCells = 3;
+    uint16_t microCellTxPower = 18;
     //uint16_t numMacroCellsWithMicroLayer = 2;
     bool useMicroLayer = false;
     
@@ -95,7 +95,7 @@ struct Parameters
     std::string scheduler = "PF";
     uint32_t freqScenario = 1; // 0->non-overlaping 1->overlapping
     double downtiltAngle = 0;
-    std::string handoverAlgo = "A2A4Rsrq"; // Options are "A3Rsrp" or "A2A4Rsrq"
+    std::string handoverAlgo = "A3Rsrp"; // Options are "A3Rsrp" or "A2A4Rsrq"
     uint32_t manualHoTriggerTime = 256 ;// milliSeconds 
     bool macroMicroSharedSpectrum = true;
     // This needs to be adjusted according to data bandwidth, or one will not be able to use the full BW of the RAN 
@@ -111,8 +111,8 @@ struct Parameters
     
     double slowUeMinSpeed = 0.5; // m/s
     double slowUeMaxSpeed = 1.5; // m/s
-    double fastUeMinSpeed = 5; // m/s
-    double fastUeMaxSpeed = 15; // m/s
+    double fastUeMinSpeed = 3; // m/s // used to be 5 
+    double fastUeMaxSpeed = 9; // m/s // used to be 15
     double fracFastUes = 0.2; 
 
     // Application traffic parameters
