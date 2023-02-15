@@ -57,11 +57,12 @@ struct Parameters
     // Deployment topology parameters
     
     uint16_t numOuterRings = 0;
-    uint16_t ueNumPergNb = 3;
+    uint16_t ueNumPerMacroGnb = 3;
+    uint16_t ueNumPerMicroGnb = 3;
     std::string rat = "LTE";
     std::string scenario = "UMi";
     uint16_t numMicroCells = 3;
-    uint16_t microCellTxPower = 18;
+    uint16_t microCellTxPower = 11;
     //uint16_t numMacroCellsWithMicroLayer = 2;
     bool useMicroLayer = false;
     
@@ -95,16 +96,18 @@ struct Parameters
     std::string scheduler = "PF";
     uint32_t freqScenario = 1; // 0->non-overlaping 1->overlapping
     double downtiltAngle = 0;
-    std::string handoverAlgo = "A3Rsrp"; // Options are "A3Rsrp" or "A2A4Rsrq"
+    std::string handoverAlgo = "A2A4Rsrq"; // Options are "A3Rsrp" or "A2A4Rsrq"
     uint32_t manualHoTriggerTime = 256 ;// milliSeconds 
     bool macroMicroSharedSpectrum = true;
     // This needs to be adjusted according to data bandwidth, or one will not be able to use the full BW of the RAN 
     uint32_t rlcUmTxBuffSize = 100*1024; //ns3 default is 10240 which is too small and restricts bandwidth 
-                                         //especially VR which pushed a very large frame to the buffer all at once  
+                                         //especially VR which pushes a very large frame to the buffer all at once
+                                         // VR burst size can be 80KB so keep this higher than that 
     
     // network parameters
     
-    uint32_t tcpSndRcvBuf = 1000*1024;  // ns3 default is 131072 which is too small and restricts bandwidth 
+    uint32_t tcpSndRcvBuf = 1000*1024;
+    //uint32_t tcpSndRcvBuf = 1000*1024;  // ns3 default is 131072 which is too small and restricts bandwidth 
                                         //especially VR which pushed a very large frame to the buffer all at once
     
     // mobility model 
@@ -114,12 +117,14 @@ struct Parameters
     double fastUeMinSpeed = 3; // m/s // used to be 5 
     double fastUeMaxSpeed = 9; // m/s // used to be 15
     double fracFastUes = 0.2; 
-
+    double microUeMinSpeed = 0.1; // m/s
+    double microUeMaxSpeed = 0.5; // m/s
+  
     // Application traffic parameters
     
     // delay measurement 
     bool traceDelay = true;
-    bool traceRtt = true;
+    bool traceRtt = false;
     // traffic apps to make it interesting
     bool traceHttp = false;
     bool traceDash = false;
@@ -132,21 +137,28 @@ struct Parameters
     bool traceFlow = false;
     
     // VR
-    uint16_t numVrUes = 1;
+    uint16_t numMacroVrUes = 1;
+    uint16_t numMicroVrUes = 3;
     double vrStartTimeMin = 2; // seconds 
     double vrStartTimeMax = 5; // seconds
     
     // DASH video streaming 
     
-    double targetDt = 30.0; // The target time difference between receiving and playing a frame. [s].
+    double targetDt = 16.0; // The target time difference between receiving and playing a frame. [s].
     double window = 5.0; // The window for measuring the average throughput. [s].
-    uint32_t bufferSpace = 10*(1000000); // The space in bytes that is used for buffering the video
+    uint32_t videoBufferSize = 5*(1024*1024); // The space in bytes that is used for buffering the video
+                                               // max bitrate is 4.2Mbps in our case so to buffer 30 s of video 
+                                               // at max rate we need 16 MB
     std::string abr = "ns3::FdashClient";
 
     // web browsing (http client)
     
-    uint32_t httpMainObjMean = 102400; 
-    uint32_t httpMainObjStd = 40960;
+    uint32_t httpMainObjMean = 202400;//102400 
+    uint32_t httpMainObjStd = 80960;//40960 
+    //new
+    uint32_t httpEmbeddedObjectSizeMean = 40000; //14000
+    uint32_t httpNumOfEmbeddedObjectsScale = 10;
+    uint32_t httpNumOfEmbeddedObjectsMax = 150;
 
     // UDP flow
     
@@ -164,7 +176,6 @@ struct Parameters
     
     uint32_t echoPacketSize = 1400;
     Time echoInterPacketInterval = Seconds (0.1);
-
     
     // Throughput measurement using BulkSend
     uint32_t ThputPacketSize = 1400;

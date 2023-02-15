@@ -50,13 +50,15 @@ namespace ns3 {
  * Global declarations
  ***************************/
 
-const Time appStartWindow = MilliSeconds (500); // 50
-//uint16_t NUM_GNBS = 0; // needs to be set in code 
+const Time appStartWindow = MilliSeconds (500);
 
 NodeContainer macroLayerGnbNodes;
 NodeContainer microLayerGnbNodes;
 NodeContainer allGnbNodes;
 NodeContainer ueNodes;
+NodeContainer ueNodesMacro;
+NodeContainer ueNodesMicro;
+  
 Ipv4InterfaceContainer ueIpIfaces;
 
 Parameters global_params;
@@ -76,10 +78,12 @@ Ptr<OutputStreamWrapper> fragmentRxStream;
 Ptr<OutputStreamWrapper> burstRxStream;   
 Ptr<OutputStreamWrapper> handoverStream;
 Ptr<OutputStreamWrapper> thputStream;
-
-// Save the ueIds as part of the different groups they are part of 
-// fast moving ueIds // no need to do slow since we have alist of all Ids
+Ptr<OutputStreamWrapper> ueGroupsStream; 
+Ptr<OutputStreamWrapper> simInfoStream;     
+    
+// Save the IMSIs as part of the different groups they are part of 
 std::vector<uint32_t> fastUes;
+//std::vector<uint32_t> macroUes;
 std::vector<uint32_t> dashAppUes;
 std::vector<uint32_t> vrAppUes;
 std::vector<uint32_t> httpAppUes;
@@ -115,15 +119,18 @@ std::vector<uint32_t> onlyDelayUes;
 uint16_t GetUeIdFromNodeId (uint16_t nodeId);
 uint16_t GetNodeIdFromContext (std::string context);
 uint16_t GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes, const Ipv4InterfaceContainer* ueIpIfaces);
-//uint16_t GetCellId_from_cellIndex (uint16_t index, uint16_t num_sites, uint16_t num_sectors);
 uint16_t GetCellId_from_cellIndex (uint16_t index);
 Ptr<LteEnbNetDevice> GetServingEnbDev_from_ueId (uint16_t ueId);
 bool isFromMicroLayer (uint16_t cellId);
 bool isFromMacroLayer (uint16_t cellId);    
 uint16_t GetImsi_from_ueId(uint16_t ueId);
+uint16_t GetImsi_from_node(Ptr<ns3::Node> ue_node);    
 uint16_t GetCellId_from_ueId(uint16_t ueId);
-Ipv4Address GetIpAddrFromUeId(uint16_t ueId);
+uint16_t GetCellId_from_ueNode(Ptr<ns3::Node> ue_node);    
+//Ipv4Address GetIpAddrFromUeId(uint16_t ueId);
+//Ipv4Address GetIpAddrFromNode (const Node* ueNode);
 void ScenarioInfo (NodeDistributionScenarioInterface* scenario);
+void PrintSimInfoToFile();
 void NotifyConnectionEstablishedUe (std::string context, uint64_t imsi,
                                uint16_t cellid, uint16_t rnti);
 void NotifyConnectionEstablishedEnb (std::string context, uint64_t imsi,
@@ -237,6 +244,9 @@ void CreateTraceFiles (void);
 
 uint16_t
 GetUeIdFromNodeId (uint16_t nodeId){
+  // WARNING: This order depends on the order and size of 
+  // NodeContainer creation in the main script  
+  // Modify this if the order of Node creation is altered
   return(nodeId - macroLayerGnbNodes.GetN());
 }
 
@@ -271,7 +281,7 @@ GetUeNodeIdFromIpAddr (Address ip_addr, const NodeContainer* ueNodes,
   return(666); // the number of the beast
 }
 
-Ipv4Address 
+/*Ipv4Address 
 GetIpAddrFromUeId (uint16_t ueId)
 {
     Ptr<Node> ue_node = ueNodes.Get (ueId);
@@ -280,6 +290,16 @@ GetIpAddrFromUeId (uint16_t ueId)
     Ipv4Address addr = iaddr.GetLocal ();
     return(addr);
 }
+    
+Ipv4Address 
+GetIpAddrFromNode (const Node* ueNode)
+{
+    Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+    Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+    Ipv4Address addr = iaddr.GetLocal ();
+    return(addr);
+}*/
+    
 
 bool 
 isFromMicroLayer (uint16_t cellId)
@@ -304,11 +324,6 @@ isFromMacroLayer (uint16_t cellId)
     return (false);
 }
 
-/*uint16_t 
-GetCellId_from_cellIndex (uint16_t index, uint16_t num_sites, uint16_t num_sectors) {
-    return ( (num_sites * (index % num_sectors)) + (index / num_sectors) + 1) ; 
-}*/
-
 uint16_t
 GetCellId_from_cellIndex (uint16_t index)
 {
@@ -328,10 +343,34 @@ GetImsi_from_ueId(uint16_t ueId){
   return(imsi);
 }
 
+uint16_t 
+GetImsi_from_node(Ptr<ns3::Node> ue_node){
+  uint16_t imsi=0;
+  if (global_params.rat == "NR"){
+    imsi = ue_node->GetDevice (0)->GetObject<NrUeNetDevice>()->GetImsi ();
+  }
+  else if (global_params.rat == "LTE"){
+    imsi = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ()->GetImsi ();
+  }
+  return(imsi);
+}
+
 uint16_t
 GetCellId_from_ueId(uint16_t ueId){
   uint16_t cellId=0;
   Ptr<Node> ue_node = ueNodes.Get (ueId);
+  if (global_params.rat == "NR"){
+    cellId = ue_node->GetDevice (0)->GetObject<NrUeNetDevice>()->GetRrc ()->GetCellId ();
+  }
+  else if (global_params.rat == "LTE"){
+    cellId = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ()->GetRrc ()->GetCellId ();
+  }
+  return(cellId);
+}
+
+uint16_t
+GetCellId_from_ueNode(Ptr<ns3::Node> ue_node){
+  uint16_t cellId=0;
   if (global_params.rat == "NR"){
     cellId = ue_node->GetDevice (0)->GetObject<NrUeNetDevice>()->GetRrc ()->GetCellId ();
   }
@@ -361,103 +400,186 @@ GetServingEnbDev_from_ueId (uint16_t ueId)
 void
 ScenarioInfo (NodeDistributionScenarioInterface* scenario)
 {
-  // Iterate through the ue container and print info 
-  std::cout << "\n================ BS Info =================" << std::endl;
-  std::cout << "All basestation locations: " << std::endl;
-  *topologyStream->GetStream()
-          << "cellId," << "gnbpos_x," << "gnbpos_y," << "gnbpos_z" << std::endl;   
+    // print the info that is needed by parsing scripts to a file 
+    PrintSimInfoToFile();
+    // Iterate through the ue container and print info 
+    std::cout << "\n================ BS Info =================" << std::endl;
+    std::cout << "All basestation locations: " << std::endl;
+    *topologyStream->GetStream() << "cellId," << "gnbpos_x," << "gnbpos_y," << "gnbpos_z" << std::endl;   
   
     for (uint32_t cellIndex = 0; cellIndex < allGnbNodes.GetN (); ++cellIndex)
     {
-      Ptr<Node> gnb = allGnbNodes.Get (cellIndex);
-      uint32_t cellId = 0; 
-      //double bsTxPower = 0;
-      Vector gnbpos = gnb->GetObject<MobilityModel> ()->GetPosition ();
-      if (global_params.rat == "NR"){
-          cellId = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetCellId ();
-          //bsTxPower = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetObject<Nr>()
-      }
-      else if (global_params.rat == "LTE"){
-          cellId = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetCellId ();
-          //bsTxPower = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetObject<LteEnbPhy>()->GetTxPower();
-      }
-      std::cout << "gnbNodes Index:" << cellIndex << " CellId: " << cellId << " pos: (" << gnbpos.x << ", " << gnbpos.y <<  ", " << gnbpos.z <<  ")  "
+        Ptr<Node> gnb = allGnbNodes.Get (cellIndex);
+        uint32_t cellId = 0; 
+        //double bsTxPower = 0;
+        Vector gnbpos = gnb->GetObject<MobilityModel> ()->GetPosition ();
+        if (global_params.rat == "NR"){
+            cellId = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetCellId ();
+            //bsTxPower = gnb->GetDevice (0)->GetObject<NrGnbNetDevice>()->GetObject<Nr>()
+        }
+        else if (global_params.rat == "LTE"){
+            cellId = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetCellId ();
+            //bsTxPower = gnb->GetDevice (0)->GetObject<LteEnbNetDevice>()->GetObject<LteEnbPhy>()->GetTxPower();
+        }
+        std::cout << "gnbNodes Index:" << cellIndex << " CellId: " << cellId << " pos: (" << gnbpos.x << ", " << gnbpos.y <<  ", " << gnbpos.z <<  ")  " << std::endl;
               //<< "   BSTxPower " << bsTxPower
-              << std::endl;
-     *topologyStream->GetStream()
-          << cellId << "," << gnbpos.x << "," << gnbpos.y <<  "," << gnbpos.z << std::endl; 
+        *topologyStream->GetStream() << cellId << "," << gnbpos.x << "," << gnbpos.y <<  "," << gnbpos.z << std::endl; 
     }
     std::cout << "\n";   
      
-  // Iterate through the ue container and print info 
-  std::cout << "\n================ UE Info =================" << std::endl;
-  for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId){
-     
-      if (global_params.rat == "NR"){
-          Ptr<Node> ue_node = ueNodes.Get (ueId);
-          Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
-          Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
-          Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
-          Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
-          Ipv4Address addr = iaddr.GetLocal ();
-          
-          // couldn't get mobility model object from netDev, 
-          // I need to get it form the node object
-          // Need to write code to get node from netdev ?? How ?  
-          //Vector gnbpos = uedev->GetTargetEnb ()->GetNode() ->GetObject<MobilityModel> ()->GetPosition ();
-          //double distance = CalculateDistance (gnbpos, uepos);
-        
-          //const double ueTxpower = uedev->GetObject<NrUePhy> ()->GetTxPower ();
-          std::cout << "NodeId "<< ue_node->GetId () 
-              << "   UeIndex(ueId) " << ueId
-              << "   IMSI " << uedev->GetImsi ()
-              << "   cellId " << GetCellId_from_ueId (ueId)
+    // Iterate through the ue container and print info 
+    std::cout << "\n================ UE Info =================" << std::endl;
+    *ueGroupsStream->GetStream() << "MacroUes,";     
+    for (uint32_t ueId = 0; ueId < ueNodesMacro.GetN (); ++ueId)
+    { 
+        if (global_params.rat == "NR")
+        {
+            Ptr<Node> ue_node = ueNodesMacro.Get (ueId);
+            Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
+            Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
+            Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+            Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+            Ipv4Address addr = iaddr.GetLocal ();
+
+            // couldn't get mobility model object from netDev, 
+            // I need to get it form the node object
+            // Need to write code to get node from netdev ?? How ?  
+            //Vector gnbpos = uedev->GetTargetEnb ()->GetNode() ->GetObject<MobilityModel> ()->GetPosition ();
+            //double distance = CalculateDistance (gnbpos, uepos);
+
+            //const double ueTxpower = uedev->GetObject<NrUePhy> ()->GetTxPower ();
+
+            *ueGroupsStream->GetStream() << uedev->GetImsi () << "," ; 
+
+            std::cout 
+              //<< "Macro NodeId "<< ue_node->GetId () 
+              //<< "   UeIndex(ueId) " << ueId
+              << "   Macro UE IMSI " << uedev->GetImsi ()
+              << "   cellId " << GetCellId_from_ueNode(ue_node)
               << "   UeIpAddr " << addr 
               << "   UePos " << uepos
               //<< "   ueTxPower " << ueTxpower
               //<< "   distance to gnb " << distance << " meters"
               << std::endl;
       }
-      else if (global_params.rat == "LTE"){
-          Ptr<Node> ue_node = ueNodes.Get (ueId);
+      else if (global_params.rat == "LTE")
+      {
+          Ptr<Node> ue_node = ueNodesMacro.Get (ueId);
           Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
           Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
           Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
           Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
           Ipv4Address addr = iaddr.GetLocal ();
-        
-          
+
+
           //double ueTxpower = ue_node->GetDevice (0)->GetObject<LteUePhy> ()->GetTxPower ();
           //Vector gnbpos = uedev->GetTargetEnb ()->GetNode()  >GetObject<MobilityModel> ()->GetPosition ();
           //double distance = CalculateDistance (gnbpos, uepos);
-          std::cout << "NodeId "<< ue_node->GetId () 
-              << "   UeIndex(ueId) " << ueId
-              << "   IMSI " << uedev->GetImsi () 
-              << "   cellId " << GetCellId_from_ueId (ueId)
+          *ueGroupsStream->GetStream() << uedev->GetImsi () << "," ; 
+          std::cout 
+              //<< "Macro UE NodeId "<< ue_node->GetId () 
+              //<< "   UeIndex(ueId) " << ueId
+              << "   Macro UE IMSI " << uedev->GetImsi () 
+              << "   cellId " << GetCellId_from_ueNode(ue_node)
               << "   UeIpAddr " << addr 
               << "   UePos " << uepos
              // << "   ueTxPower " << ueTxpower
               //<< "   distance to gnb " << distance << " meters"
               << std::endl;
       }
-  }  
-  std::cout << "\n";  
-  //list all the fast UEs
-  std::cout << "Fast moving UeIds" << std::endl;
-  for(std::vector<uint32_t>::iterator iter = fastUes.begin(); iter < fastUes.end(); iter++)
-  {
-    if (global_params.rat == "NR"){
-      Ptr<Node> ue_node = ueNodes.Get (*iter);
-      Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
-      std::cout <<"UE ID: " << *iter << "  UE IMSI: " << uedev->GetImsi () << "\n";
     }
-    else if (global_params.rat == "LTE"){
-      Ptr<Node> ue_node = ueNodes.Get (*iter);
-      Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
-      std::cout <<"UE ID: " << *iter << "  UE IMSI: " << uedev->GetImsi () << "\n";
+    *ueGroupsStream->GetStream() << "\n";  
+    if (global_params.useMicroLayer)
+    {
+        for (uint32_t ueId = 0; ueId < ueNodesMicro.GetN (); ++ueId)
+        {
+            if (global_params.rat == "NR")
+            {
+                Ptr<Node> ue_node = ueNodesMicro.Get (ueId);
+                Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
+                Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
+                Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+                Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+                Ipv4Address addr = iaddr.GetLocal ();
+
+                // couldn't get mobility model object from netDev, 
+                // I need to get it form the node object
+                // Need to write code to get node from netdev ?? How ?  
+                //Vector gnbpos = uedev->GetTargetEnb ()->GetNode() ->GetObject<MobilityModel> ()->GetPosition ();
+                //double distance = CalculateDistance (gnbpos, uepos);
+
+                //const double ueTxpower = uedev->GetObject<NrUePhy> ()->GetTxPower ();
+                std::cout 
+                  //<< "Micro NodeId "<< ue_node->GetId () 
+                  //<< "   UeIndex(ueId) " << ueId
+                  << "   Micro UE IMSI " << uedev->GetImsi ()
+                  << "   cellId " << GetCellId_from_ueNode(ue_node)
+                  << "   UeIpAddr " << addr 
+                  << "   UePos " << uepos
+                  //<< "   ueTxPower " << ueTxpower
+                  //<< "   distance to gnb " << distance << " meters"
+                  << std::endl;
+            }
+            else if (global_params.rat == "LTE")
+            {
+                Ptr<Node> ue_node = ueNodesMicro.Get (ueId);
+                Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
+                Vector uepos = ue_node->GetObject<MobilityModel> ()->GetPosition ();
+                Ptr<Ipv4> ipv4 = ue_node->GetObject<Ipv4> ();
+                Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+                Ipv4Address addr = iaddr.GetLocal ();
+
+                //double ueTxpower = ue_node->GetDevice (0)->GetObject<LteUePhy> ()->GetTxPower ();
+                //Vector gnbpos = uedev->GetTargetEnb ()->GetNode()  >GetObject<MobilityModel> ()->GetPosition ();
+                //double distance = CalculateDistance (gnbpos, uepos);
+                std::cout 
+                  //<< "Micro UE NodeId "<< ue_node->GetId () 
+                  //<< "   UeIndex(ueId) " << ueId
+                  << "   Micro UE IMSI " << uedev->GetImsi () 
+                  << "   cellId " << GetCellId_from_ueNode(ue_node)
+                  << "   UeIpAddr " << addr 
+                  << "   UePos " << uepos
+                 // << "   ueTxPower " << ueTxpower
+                  //<< "   distance to gnb " << distance << " meters"
+                  << std::endl;
+            }
+        }
     }
-  }
-  std::cout << "\n";
+    std::cout << "\n";  
+  
+    //list all the fast UEs
+    std::cout << "Fast moving UeIds" << std::endl;
+    *ueGroupsStream->GetStream() << "fastUes,";   
+       
+    for(std::vector<uint32_t>::iterator iter = fastUes.begin(); iter < fastUes.end(); iter++)
+    {
+        //std::cout <<"  UE IMSI: " << *iter << "\n";
+        //*ueGroupsStream->GetStream() << *iter << "," ; 
+        
+        if (global_params.rat == "NR")
+        {
+            Ptr<Node> ue_node = ueNodesMacro.Get (*iter);
+            Ptr<NrUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<NrUeNetDevice> ();
+            std::cout <<"  UE IMSI: " << uedev->GetImsi () << "\n";
+            *ueGroupsStream->GetStream() << uedev->GetImsi () << "," ; 
+        }
+        else if (global_params.rat == "LTE")
+        {
+            Ptr<Node> ue_node = ueNodesMacro.Get (*iter);
+            Ptr<LteUeNetDevice> uedev = ue_node->GetDevice (0)->GetObject<LteUeNetDevice> ();
+            std::cout <<"  UE IMSI: " << uedev->GetImsi () << "\n";
+            *ueGroupsStream->GetStream() << uedev->GetImsi () << "," ;
+        }
+    }
+    std::cout << "\n";
+    *ueGroupsStream->GetStream() << "\n";
+    
+    *ueGroupsStream->GetStream() << "onlyDelayUes,";     
+    for(std::vector<uint32_t>::iterator iter = onlyDelayUes.begin(); iter < onlyDelayUes.end(); iter++)
+    {
+        *ueGroupsStream->GetStream() << *iter << "," ; 
+    }
+    *ueGroupsStream->GetStream() << "\n";
 }
     
     
@@ -477,7 +599,7 @@ void CheckForManualHandovers (Ptr<LteHelper> &lteHelper)
         // distance to current cell
         double current_dist = attachedGnb_mob_model->GetDistanceFrom (ue_mob_model);
         
-        uint32_t attached_cellId = GetCellId_from_ueId(ueId);
+        uint32_t attached_cellId = GetCellId_from_ueNode(ue_node);
         uint16_t target_cellId = attached_cellId;
         uint16_t target_cellIndex=666;
         
@@ -614,7 +736,7 @@ LogPosition (Ptr<OutputStreamWrapper> stream)
             << Simulator::Now ().GetMicroSeconds ()
             << "\t" << ueId
             << "\t" << GetImsi_from_ueId(ueId)
-            << "\t" << GetCellId_from_ueId(ueId)
+            << "\t" << GetCellId_from_ueNode(ue_node)
             << "\t" << pos.x << "\t" << pos.y << "\t" << pos.z
             << "\t" << vel.x << "\t" << vel.y << "\t" << vel.z
             << std::endl;
@@ -1091,6 +1213,9 @@ void CreateTraceFiles (void)
           << "cellId\t" << "targetCellId" << std::endl;
   
     topologyStream = traceHelper.CreateFileStream ("gnb_locations.txt"); 
+    ueGroupsStream = traceHelper.CreateFileStream ("ue_gnb_groups.txt"); 
+    simInfoStream = traceHelper.CreateFileStream ("sim_info.txt"); 
+    
     if(global_params.traceDelay)
     {
         delayStream = traceHelper.CreateFileStream ("delay_trace.txt");
@@ -1171,10 +1296,99 @@ void CreateTraceFiles (void)
     }
 }    
     
+// Print the scenario parameters into a file for the parsing and visualisation scripts to use 
+void PrintSimInfoToFile()
+{
+    *simInfoStream->GetStream() <<"parameter,value" << "\n"; 
+    *simInfoStream->GetStream() << "macro_rings," << global_params.numOuterRings << "\n";
+    *simInfoStream->GetStream() << "macro_num_bs," << macroLayerGnbNodes.GetN() << "\n";
+    *simInfoStream->GetStream() << "macro_layer_ues," << ueNodesMacro.GetN() << "\n";
+    *simInfoStream->GetStream() << "simulation_time_seconds," << global_params.appGenerationTime.GetSeconds() << "\n";
+    *simInfoStream->GetStream() << "rand_seed," << global_params.randSeed << "\n"; 
+    *simInfoStream->GetStream() << "create_micro_layer," << (global_params.useMicroLayer ? 1 : 0) << "\n";
+    *simInfoStream->GetStream() << "scheduler," << global_params.scheduler << "\n";
+    *simInfoStream->GetStream() << "handover_algo," << global_params.handoverAlgo << "\n";
+    if (global_params.useMicroLayer)
+    {
+        *simInfoStream->GetStream() << "micro_num_bs," << microLayerGnbNodes.GetN() << "\n";
+        *simInfoStream->GetStream() << "micro_layer_ues," << ueNodesMicro.GetN() << "\n";
+    } 
+    *simInfoStream->GetStream() << "delay_app_installed," << (global_params.traceDelay ? 1 : 0) << "\n";
+    if (global_params.traceDelay)
+    {
+        *simInfoStream->GetStream() << "delay_pkt_interval_seconds," << global_params.delayInterval.As (Time::S) << "\n";
+    }
+    *simInfoStream->GetStream() << "rtt_app_installed," << (global_params.traceRtt ? 1 : 0) << "\n";
+    *simInfoStream->GetStream() << "http_app_installed," << (global_params.traceHttp ? 1 : 0) << "\n";
+    *simInfoStream->GetStream() << "dash_app_installed," << (global_params.traceDash ? 1 : 0) << "\n";
+    *simInfoStream->GetStream() << "vr_app_installed," << (global_params.traceVr ? 1 : 0) << "\n";   
     
-    
-// Print the scenario parameters
+    // Yet to be filled in
+    /*
+    *simInfoStream->GetStream() << "macro_tx_power," <<  << "\n"
+    *simInfoStream->GetStream() << "macro_antenna," <<  << "\n";
+    *simInfoStream->GetStream() << "rat," << p.rat << "\n";
+    *simInfoStream->GetStream() << "macro_antenna_gain," <<  << "\n";
+    *simInfoStream->GetStream() << "macro_antenna_beamwidth," <<  << "\n";
+    *simInfoStream->GetStream() << "macro_antenna_downtilt_angle," << p.downtiltAngle << "\n";
+    *simInfoStream->GetStream() << "propagation_model," <<  << "\n";
+    *simInfoStream->GetStream() << "macro_ISD," <<  << "\n";
+    *simInfoStream->GetStream() << "macro_bs_height," <<  << "\n";
+    *simInfoStream->GetStream() << "ue_height," << p.ueHeight << "\n";
+    *simInfoStream->GetStream() << "macro_boundingBox_size," <<  << "\n";
+    if (p.useMicroLayer)
+    {
+        *simInfoStream->GetStream() << "micro_bs_height," <<  << "\n";
+        *simInfoStream->GetStream() << "micro_antenna," << "Isotropic" << "\n";
+        *simInfoStream->GetStream() << "micro_tx_power," << p.microCellTxPower << "\n";
+        *simInfoStream->GetStream() << "micro_boundingBox_size," <<  << "\n";
+    } 
+    // Radio related 
+    *simInfoStream->GetStream() << "duplex_mode," << p.operationMode << "\n";
+    *simInfoStream->GetStream() << "enableUlPc," << (p.enableUlPc ? 1 : 0) << "\n";
+    *simInfoStream->GetStream() << "macro_bw_hz," << p.bandwidthMHz << "\n";
+    *simInfoStream->GetStream() << "micro_bw_hz," << p.microBandwidthMHz << "\n";
 
+        
+    *simInfoStream->GetStream() << "rlc_buffer_size_bytes," << p.rlcUmTxBuffSize << "\n"; 
+    *simInfoStream->GetStream() << "tcp_buffer_size_bytes," << p.tcpSndRcvBuf << "\n";
+    *simInfoStream->GetStream() << "mobility_model," << "Random way point" << "\n";
+    *simInfoStream->GetStream() << "macro_fracFastUes," << p.fracFastUes << "\n";
+    
+    *simInfoStream->GetStream() << "delay_app_installed," << (p.traceDelay ? 1 : 0) << "\n";
+    if (p.traceDelay)
+    {
+        *simInfoStream->GetStream() << "delay_pkt_size_bytes," << p.delayPacketSize << "\n";
+        *simInfoStream->GetStream() << "delay_pkt_interval_seconds," << p.delayInterval.As (Time::S) << "\n";
+    }
+    *simInfoStream->GetStream() << "rtt_app_installed," << (p.traceRtt ? 1 : 0) << "\n";
+    if (p.traceRtt)
+    {
+        *simInfoStream->GetStream() << "rtt_pkt_size_bytes," << p.echoPacketSize << "\n";
+        *simInfoStream->GetStream() << "rtt_pkt_interval_seconds," << p.echoInterPacketInterval.As (Time::S) << "\n";
+    }
+    *simInfoStream->GetStream() << "http_app_installed," << (p.traceHttp ? 1 : 0) << "\n";
+    if (p.traceHttp)
+    {
+        *simInfoStream->GetStream() << "," <<  << "\n";
+        *simInfoStream->GetStream() << "," <<  << "\n";
+    }
+    *simInfoStream->GetStream() << "dash_app_installed," << (p.traceDash ? 1 : 0) << "\n";
+    if (p.traceDash)
+    {
+        *simInfoStream->GetStream() << "," <<  << "\n";
+        *simInfoStream->GetStream() << "," <<  << "\n";
+    }
+    *simInfoStream->GetStream() << "vr_app_installed," << (p.traceVr ? 1 : 0) << "\n";
+    if (p.traceVr)
+    {
+        *simInfoStream->GetStream() << "," <<  << "\n";
+        *simInfoStream->GetStream() << "," <<  << "\n";
+    }*/    
+}
+
+
+// Print the scenario parameters into a file for the parsing and visualisation scripts to use 
 std::ostream & operator << (std::ostream & os, const Parameters & parameters)
 {
     // Use p as shorthand for arg parameters
@@ -1205,10 +1419,11 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
             MSG ("Micro layer num of BSs") << p.numMicroCells;
             MSG ("Micro layer BS antenna pattern") << "Isotropic";
             MSG ("Micro cell Tx power") << p.microCellTxPower;
+            MSG ("Number of UEs per Micro BS") << p.ueNumPerMicroGnb;
         }
     }  
-    MSG ("Num of UEs") << ueNodes.GetN();
-    MSG ("Number of UEs per BS (per sector)") << p.ueNumPergNb;
+    MSG ("Number of UEs per Macro BS (per sector)") << p.ueNumPerMacroGnb;
+    MSG ("Total Num of UEs") << ueNodes.GetN();
     MSG ("Antenna down tilt angle") << p.downtiltAngle << " deg";
     MSG ("3GPP Scenario") << p.scenario;
 
@@ -1280,7 +1495,7 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
     
     MSG ("Delay/RTT Pkt size") << p.delayPacketSize;
     MSG ("Delay/RTT Probe interval") << p.delayInterval.As (Time::S);
-    MSG ("Video streaming Client Buffer") << p.bufferSpace << " Bytes";
+    MSG ("Video streaming Client Buffer") << p.videoBufferSize << " Bytes";
 
     MSG ("");
     MSG ("Simulations Parameters");

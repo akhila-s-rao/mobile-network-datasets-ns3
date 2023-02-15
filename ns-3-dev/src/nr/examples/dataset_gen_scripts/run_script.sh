@@ -4,11 +4,11 @@ sleep 1
 
 # debug mode runs using gdb. Make sure to set the particular run number you want 
 # (probably the one that crashed the quickest)
-debug_mode=0
+debug_mode=1
 
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
-num_sim_campaigns=2
+num_sim_campaigns=1
 
 # Save the directory location which has the run script and the simulations script
 run_script_loc=$(pwd)
@@ -33,7 +33,7 @@ mkdir "$data_dir1/$script_save_dir_name"
 cp -r "$run_script_loc/"* "$data_dir1/$script_save_dir_name/."
 
 len=10
-seed_shifter=10
+seed_shifter=0
 
 if [ $debug_mode -eq 1 ]
 then
@@ -46,9 +46,10 @@ do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
-       --ueNumPergNb=20 \
-       --useMicroLayer=false \
+       --ueNumPerMacroGnb=5 \
+       --useMicroLayer=true \
 	   --numMicroCells=3 \
+       --ueNumPerMicroGnb=10 \
 	   --appGenerationTime=100 \
 	   --rat=LTE \
 	   --operationMode=FDD \
@@ -56,12 +57,14 @@ do
        --enableUlPc=true \
        --appDlThput=false \
        --appUlThput=false \
-       --appHttp=false \
-       --appDash=false \
-       --appVr=false \
-       --numVrUes=1 \
+       --appHttp=true \
+       --appDash=true \
+       --appVr=true \
+       --numMacroVrUes=1 \
+       --numMicroVrUes=3 \
        --freqScenario=1 \
-       --randomSeed=$(($i + $seed_shifter))"
+       --randomSeed=19"
+       #--randomSeed=$(($i + $seed_shifter))"
 
   run_dir="run$(($i + 1))"  
   mkdir "$data_dir1/$run_dir"
@@ -107,16 +110,17 @@ mkdir "$data_dir2/$script_save_dir_name"
 cp -r "$run_script_loc/"* "$data_dir2/$script_save_dir_name/."
 
 len=10
-seed_shifter=10
+seed_shifter=150
 #i=3
 for (( i=0; i<$len; i++ ))
 do
   cmd_args="cellular-network-user \
 	   --scenario=UMi \
 	   --numRings=0 \
-       --ueNumPergNb=30 \
-       --useMicroLayer=false \
+       --ueNumPerMacroGnb=5 \
+       --useMicroLayer=true \
 	   --numMicroCells=3 \
+       --ueNumPerMicroGnb=10 \
 	   --appGenerationTime=100 \
 	   --rat=LTE \
 	   --operationMode=FDD \
@@ -124,10 +128,11 @@ do
        --enableUlPc=true \
        --appDlThput=false \
        --appUlThput=false \
-       --appHttp=false \
-       --appDash=false \
-       --appVr=false \
-       --numVrUes=1 \
+       --appHttp=true \
+       --appDash=true \
+       --appVr=true \
+       --numMacroVrUes=1 \
+       --numMicroVrUes=3 \
        --freqScenario=1 \
        --randomSeed=$(($i + $seed_shifter))"
 

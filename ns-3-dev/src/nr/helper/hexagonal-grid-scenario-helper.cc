@@ -50,16 +50,16 @@ std::vector<double> HexagonalGridScenarioHelper::siteAngles {0,30,90,150,210,270
 static void
 PlotHexagonalDeployment (const Ptr<const ListPositionAllocator> &sitePosVector,
                          const Ptr<const ListPositionAllocator> &cellCenterVector,
-                         const Ptr<const ListPositionAllocator> &utPosVector,
+                         //const Ptr<const ListPositionAllocator> &utPosVector,
                          double cellRadius)
 {
   uint16_t numCells = cellCenterVector->GetSize ();
   uint16_t numSites = sitePosVector->GetSize ();
   uint16_t numSectors = numCells / numSites;
-  uint16_t numUts = utPosVector->GetSize ();
+  //uint16_t numUts = utPosVector->GetSize ();
   NS_ASSERT_MSG (numCells > 0, "no cells");
   NS_ASSERT_MSG (numSites > 0, "no sites");
-  NS_ASSERT_MSG (numUts > 0,   "no uts");
+  //NS_ASSERT_MSG (numUts > 0,   "no uts");
 
   // Try to open a new GNUPLOT file
   std::ofstream topologyOutfile;
@@ -223,21 +223,21 @@ HexagonalGridScenarioHelper::CreateScenario ()
   m_hexagonalRadius = m_isd / 3;
   
   m_bs.Create (m_numBs);
-  m_ut.Create (m_numUt);
+  //m_ut.Create (m_numUt);
 
   NS_ASSERT (m_isd > 0);
   NS_ASSERT (m_numRings < 4);
   NS_ASSERT (m_hexagonalRadius > 0);
   NS_ASSERT (m_bsHeight >= 0.0);
-  NS_ASSERT (m_utHeight >= 0.0);
+  //NS_ASSERT (m_utHeight >= 0.0);
   NS_ASSERT (m_bs.GetN () > 0);
-  NS_ASSERT (m_ut.GetN () > 0);
+  //NS_ASSERT (m_ut.GetN () > 0);
 
   MobilityHelper mobility;
   Ptr<ListPositionAllocator> bsPosVector = CreateObject<ListPositionAllocator> ();
   Ptr<ListPositionAllocator> bsCenterVector = CreateObject<ListPositionAllocator> ();
   Ptr<ListPositionAllocator> sitePosVector = CreateObject<ListPositionAllocator> ();
-  Ptr<ListPositionAllocator> utPosVector = CreateObject<ListPositionAllocator> ();
+  //Ptr<ListPositionAllocator> utPosVector = CreateObject<ListPositionAllocator> ();
 
   // BS position
   for (uint16_t cellId = 0; cellId < m_numBs; cellId++)
@@ -278,6 +278,8 @@ HexagonalGridScenarioHelper::CreateScenario ()
   // Need to weight r to get uniform in the sector hexagon
   // See https://stackoverflow.com/questions/5837572
   // Set max = radius^2 here, then take sqrt below
+  
+/*
   const double outerR = m_hexagonalRadius * std::sqrt(3) / 2 - m_minBsUtDistance;
   m_r->SetAttribute ("Min", DoubleValue (0));
   m_r->SetAttribute ("Max", DoubleValue (outerR * outerR));
@@ -298,7 +300,7 @@ HexagonalGridScenarioHelper::CreateScenario ()
       utPos.z = m_utHeight;
       
       utPosVector->Add (utPos);
-    }
+    }*/
 
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.SetPositionAllocator (bsPosVector);
@@ -308,7 +310,7 @@ HexagonalGridScenarioHelper::CreateScenario ()
   //mobility.SetPositionAllocator (utPosVector);
   //mobility.Install (m_ut);
 
-  PlotHexagonalDeployment (sitePosVector, bsCenterVector, utPosVector, m_hexagonalRadius);
+  PlotHexagonalDeployment (sitePosVector, bsCenterVector, m_hexagonalRadius);
 
 }
 

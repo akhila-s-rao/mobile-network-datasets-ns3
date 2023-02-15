@@ -309,6 +309,7 @@ LteEnbPhy::SetTxPower (double pow)
 {
   NS_LOG_FUNCTION (this << pow);
   m_txPower = pow;
+  std::cout << " eNB Tx power: " << pow << " dBm" << std::endl;
 }
 
 double

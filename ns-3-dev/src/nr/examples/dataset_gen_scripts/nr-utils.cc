@@ -79,17 +79,19 @@ NrUtils::SetNrSimulatorParameters (const double sector0AngleRad,
                                            const NodeContainer &gnbSector1Container,
                                            const NodeContainer &gnbSector2Container,
                                            const NodeContainer &gnbSector3Container,
-                                           const NodeContainer &ueSector1Container,
-                                           const NodeContainer &ueSector2Container,
-                                           const NodeContainer &ueSector3Container,
+                                           //const NodeContainer &ueSector1Container,
+                                           //const NodeContainer &ueSector2Container,
+                                           //const NodeContainer &ueSector3Container,
+                                           const NodeContainer &ueNodesContainer,
                                            const Ptr<PointToPointEpcHelper> &baseEpcHelper,
                                            Ptr<NrHelper> &nrHelper,
                                            NetDeviceContainer &gnbSector1NetDev,
                                            NetDeviceContainer &gnbSector2NetDev,
                                            NetDeviceContainer &gnbSector3NetDev,
-                                           NetDeviceContainer &ueSector1NetDev,
-                                           NetDeviceContainer &ueSector2NetDev,
-                                           NetDeviceContainer &ueSector3NetDev,
+                                           //NetDeviceContainer &ueSector1NetDev,
+                                           //NetDeviceContainer &ueSector2NetDev,
+                                           //NetDeviceContainer &ueSector3NetDev,
+                                           NetDeviceContainer &ueNetDevsContainer,
                                            bool enableUlPc,
                                            const std::string &scheduler,
                                            uint32_t bandwidthMHz, uint32_t freqScenario,
@@ -500,20 +502,24 @@ NrUtils::SetNrSimulatorParameters (const double sector0AngleRad,
   gnbNetDevs.Add (gnbSector2NetDev);
   gnbSector3NetDev = nrHelper->InstallGnbDevice (gnbSector3Container, sector3Bwps);
   gnbNetDevs.Add (gnbSector3NetDev);
+  /*
   ueSector1NetDev = nrHelper->InstallUeDevice (ueSector1Container, sector1Bwps);
   NetDeviceContainer ueNetDevs (ueSector1NetDev);
   ueSector2NetDev = nrHelper->InstallUeDevice (ueSector2Container, sector2Bwps);
   ueNetDevs.Add (ueSector2NetDev);
   ueSector3NetDev = nrHelper->InstallUeDevice (ueSector3Container, sector3Bwps);
-  ueNetDevs.Add (ueSector3NetDev);
+  ueNetDevs.Add (ueSector3NetDev);*/
+  // all BWPs are the same when using the overlapping frequency scenario 
+  ueNetDevsContainer = nrHelper->InstallUeDevice (ueNodesContainer, sector1Bwps);  
 
   int64_t randomStream = 1;
   randomStream += nrHelper->AssignStreams (gnbSector1NetDev, randomStream);
   randomStream += nrHelper->AssignStreams (gnbSector2NetDev, randomStream);
   randomStream += nrHelper->AssignStreams (gnbSector3NetDev, randomStream);
-  randomStream += nrHelper->AssignStreams (ueSector1NetDev, randomStream);
-  randomStream += nrHelper->AssignStreams (ueSector2NetDev, randomStream);
-  randomStream += nrHelper->AssignStreams (ueSector3NetDev, randomStream);
+  randomStream += nrHelper->AssignStreams (ueNetDevsContainer, randomStream);
+  //randomStream += nrHelper->AssignStreams (ueSector1NetDev, randomStream);
+  //randomStream += nrHelper->AssignStreams (ueSector2NetDev, randomStream);
+  //randomStream += nrHelper->AssignStreams (ueSector3NetDev, randomStream);
 
   /*
    * Case (iii): Go node for node and change the attributes we have to setup
@@ -553,7 +559,7 @@ NrUtils::SetNrSimulatorParameters (const double sector0AngleRad,
 
 
   // Set the UE routing:
-  for (auto nd = ueNetDevs.Begin (); nd != ueNetDevs.End (); ++nd)
+  for (auto nd = ueNetDevsContainer.Begin (); nd != ueNetDevsContainer.End (); ++nd)
     {
       auto uePhyFirst = nrHelper->GetUePhy (*nd, 0);
       auto uePhySecond {uePhyFirst};
@@ -590,7 +596,7 @@ NrUtils::SetNrSimulatorParameters (const double sector0AngleRad,
       DynamicCast<NrGnbNetDevice> (*nd)->UpdateConfig ();
     }
 
-  for (auto nd = ueNetDevs.Begin (); nd != ueNetDevs.End (); ++nd)
+  for (auto nd = ueNetDevsContainer.Begin (); nd != ueNetDevsContainer.End (); ++nd)
     {
       DynamicCast<NrUeNetDevice> (*nd)->UpdateConfig ();
     }

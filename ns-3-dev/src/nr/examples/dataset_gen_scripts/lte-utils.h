@@ -35,17 +35,19 @@ public:
                                 NodeContainer enbSector1Container,
                                 NodeContainer enbSector2Container,
                                 NodeContainer enbSector3Container,
-                                NodeContainer ueSector1Container,
-                                NodeContainer ueSector2Container,
-                                NodeContainer ueSector3Container,
+                                //NodeContainer ueSector1Container,
+                                //NodeContainer ueSector2Container,
+                                //NodeContainer ueSector3Container,
+                                NodeContainer ueNodesContainer,
                                 Ptr<PointToPointEpcHelper> &epcHelper,
                                 Ptr<LteHelper> &lteHelper,
                                 NetDeviceContainer &enbSector1NetDev,
                                 NetDeviceContainer &enbSector2NetDev,
-                                NetDeviceContainer &enbSector3NetDev,
-                                NetDeviceContainer &ueSector1NetDev,
-                                NetDeviceContainer &ueSector2NetDev,
-                                NetDeviceContainer &ueSector3NetDev);
+                                NetDeviceContainer &enbSector3NetDev);
+                                //NetDeviceContainer &ueSector1NetDev,
+                                //NetDeviceContainer &ueSector2NetDev,
+                                //NetDeviceContainer &ueSector3NetDev);
+                                //NetDeviceContainer &ueNetDevsContainer);
 };
 
 } // namespace ns3

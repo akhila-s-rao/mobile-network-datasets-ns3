@@ -66,58 +66,35 @@ void CellularNetwork (const Parameters &params){
 
     RngSeedManager::SetSeed (params.randSeed+1); 
     RngSeedManager::SetRun (params.randSeed);
-
-    // NS logging 
-    // NOTE: these logs will show only when the code is NOT build as optimized   
-    /*LogComponentEnableAll (LOG_PREFIX_TIME);
-    LogComponentEnable ("TcpSocketBase", LOG_LEVEL_ALL);
-    LogComponentEnable ("UdpClient", LOG_LEVEL_INFO);
-    LogComponentEnable ("UdpServer", LOG_LEVEL_INFO);
-    LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_ALL);
-    LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_ALL);
-    LogComponentEnable ("DashServer", LOG_LEVEL_ALL);
-    LogComponentEnable ("DashClient", LOG_LEVEL_ALL);
-    LogComponentEnable ("ThreeGppHttpServer", LOG_LEVEL_INFO);
-    LogComponentEnable ("ThreeGppHttpClient", LOG_LEVEL_INFO);*/
-    LogComponentEnable ("BurstyApplication", LOG_ALL);
-    LogComponentEnable ("BurstSink", LOG_ALL);
     
-    // Create Trace files and write the column names 
-    // To prevent the should trigger HO Preparation Failure, but it is not implemented ASSERT
-    Config::SetDefault ("ns3::LteEnbMac::NumberOfRaPreambles", UintegerValue (40));
     // Default values for the simulation. 
-    // This number must be larger than the max number of UEs that could be connected to a BS
-    // There is a mismatch in how this attribute is presented versus how it works. 
+    Config::SetDefault ("ns3::LteEnbMac::NumberOfRaPreambles", UintegerValue (40));
+    // SrsPeriodicity must be larger than the max number of UEs that could be connected to a BS
     // The UeSinrSamplePeriod and InterferenceSamplePeriod from LteEnbPhy are multiplied by this SrsPeriodicity
     // because I guess they are measured on every srsReport. So make to account for this when you set the logging period   
     Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (80));// 320 is max {0, 2, 5, 10, 20, 40,  80, 160, 320}
     //Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
     Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
-
     // Set time granularity for RAN traces that are periodic
     Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
     Config::SetDefault ("ns3::LteEnbPhy::UeSinrSamplePeriod", UintegerValue (1)); // The real sample period is multiplied by ns3::LteEnbRrc::SrsPeriodicity
     Config::SetDefault ("ns3::LteEnbPhy::InterferenceSamplePeriod", UintegerValue (1)); // The real sample period is multiplied by ns3::LteEnbRrc::SrsPeriodicity
-
     // This is set in the lte-utils (not nr-utils however) 
     //Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (10 * 1024)); //default is 10240 
-
     Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (params.tcpSndRcvBuf));// default is 131072
     Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (params.tcpSndRcvBuf));// default is 131072
-   
     // Need to increase size from default for larger webpages.  
     Config::SetDefault ("ns3::ThreeGppHttpVariables::MainObjectSizeMean", UintegerValue (params.httpMainObjMean));
     Config::SetDefault ("ns3::ThreeGppHttpVariables::MainObjectSizeStdDev", UintegerValue (params.httpMainObjStd));
     
+    Config::SetDefault ("ns3::ThreeGppHttpVariables::EmbeddedObjectSizeMean", UintegerValue (params.httpEmbeddedObjectSizeMean));
+    Config::SetDefault ("ns3::ThreeGppHttpVariables::NumOfEmbeddedObjectsScale", UintegerValue (params.httpNumOfEmbeddedObjectsScale));
+    Config::SetDefault ("ns3::ThreeGppHttpVariables::NumOfEmbeddedObjectsMax", UintegerValue (params.httpNumOfEmbeddedObjectsMax));
+    
+    
     // Create user created trace files with corresponding column names
     CreateTraceFiles ();
-    
-    std::string traceFolder = params.ns3Dir + "src/vr-app/model/BurstGeneratorTraces/"; // example traces can be found here
-    // The current working directory set to direct the log files generated into the run specific folders
-    //std::filesystem::path cwd = std::filesystem::current_path();
-    //std::cout << "Current working directory is " << cwd.string() << std::endl;
-    // Where the executable I am running is located 
-    //std::cout << "This executable is located at " << ns3::SystemPath::FindSelfDirectory() << std::endl;	
+    std::string traceFolder = params.ns3Dir + "src/vr-app/model/BurstGeneratorTraces/"; // example traces can be found here	
 
     // Trace files for VR     
     std::string vrTraceFiles[8]
@@ -125,61 +102,45 @@ void CellularNetwork (const Parameters &params){
         "mc_10mbps_60fps.csv", "ge_cities_10mbps_60fps.csv", "ge_tour_10mbps_60fps.csv", "vp_10mbps_60fps.csv"};
     uint16_t vrTraceFileIndex = 0;
     
-    /**********************************************
-    * Create scenario
-    **********************************************/
+    int64_t randomStream = 1;
+    
+    /****************************************************
+    * Macro gNBs and all UEs: topology scenario screation
+    *****************************************************/
 
-    /***  ScenarioParameters ***/
     // Sets the right values for ISD etc. for scenario type (UMa, UMi ..)
     // ScenarioParameters sets a 3 sector per site deployment
     // Can be set to NONE if I want omnidirectional 
     ScenarioParameters scenarioParams;
     scenarioParams.SetScenarioParameters (params.scenario);
-
     // The essentials describing a laydown
     uint32_t gnbSites = 0;
     double sector0AngleRad = 0;
     const uint32_t sectors = 3;
-
-    /*** NodeDistributionScenarioInterface ***/
     // Creates framework for sites, sectors and antenna orientation  
     NodeDistributionScenarioInterface * scenario {NULL};
-    
-    /*** HexagonalGridScenarioHelper ***/
     // Sets the locations of base stations for a hex topology 
     // Inherits from NodeDistributionScenarioInterface
     HexagonalGridScenarioHelper gridScenario;
-
     gridScenario.SetScenarioParameters (scenarioParams);
     gridScenario.SetNumRings (params.numOuterRings);
     gnbSites = gridScenario.GetNumSites ();
     // I changed this to reflect the number of macro and micro layers
-    // Also I am not using allGnbNodes.GetN() here because it hasn't been initialized yet 
     uint32_t ueNum;
     if (params.useMicroLayer)
-        ueNum = params.ueNumPergNb * ( gnbSites * sectors + params.numMicroCells);
+        ueNum = (params.ueNumPerMacroGnb * gnbSites * sectors) + (params.ueNumPerMicroGnb * params.numMicroCells) ;
     else
-        ueNum = params.ueNumPergNb * gnbSites * sectors;
-    
-    //WARNING
-    //ueNum = 1;
-  
-  
-    gridScenario.SetUtNumber (ueNum);
+        ueNum = params.ueNumPerMacroGnb * gnbSites * sectors;
+
     sector0AngleRad = gridScenario.GetAntennaOrientationRadians (0);
     std::cout << "sector0AngleRad: " << sector0AngleRad << std::endl;
 
     // Creates and plots the network deployment and assigns gnb and ue containers
     gridScenario.CreateScenario ();
     macroLayerGnbNodes = gridScenario.GetBaseStations ();
-    ueNodes = gridScenario.GetUserTerminals ();
+    allGnbNodes.Add (macroLayerGnbNodes);
+    ueNodes.Create(ueNum);
     scenario = &gridScenario;
-
-    // Log the topology configuration 
-    std::cout << "\nMacro topology Configuration: " << gnbSites << " sites, "
-            << sectors << " sectors/site, "
-            << macroLayerGnbNodes.GetN ()   << " macro cells, "
-            << ueNodes.GetN ()    << " UEs\n";
 
     // Create gNodeB containers by sector 
     NodeContainer gnbSector1Container, gnbSector2Container, gnbSector3Container;
@@ -190,27 +151,36 @@ void CellularNetwork (const Parameters &params){
         Ptr<Node> gnb = macroLayerGnbNodes.Get (cellId);
         auto sector = scenario->GetSectorIndex (cellId);
         gnbNodesBySector[sector]->Add (gnb);
-    }
-    
-    /*
-    * Create different UE NodeContainer for the different sectors.
-    * Iterate/index ueNodes, ueNetDevs, ueIpIfaces by `ueId`.
-    * Iterate/Index ueSector<N>Container, ueNodesBySector[sector],
-    *   ueSector<N>NetDev, ueNdBySector[sector] with i % gnbSites
-    */
-    NodeContainer ueSector1Container, ueSector2Container, ueSector3Container;
-    std::vector<NodeContainer*> ueNodesBySector {&ueSector1Container, &ueSector2Container, &ueSector3Container};
-    for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
+    } 
+  
+    // Separate out the macro and micro ueNodes so that we can handle their mobility models and app 
+    // installations separately. Since we are separating them inside here, this section of code needs 
+    // to be before the installation of macro UE mobility and applications  
+    // The first numMacro UEs are macro and the rest are micro     
+    if (params.useMicroLayer) 
     {
-        Ptr<Node> ue = ueNodes.Get (ueId);
-        auto cellId = scenario->GetCellIndex (ueId);
-        auto sector = scenario->GetSectorIndex (cellId);
-        ueNodesBySector[sector]->Add (ue);
-    }   
+        for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
+        {
+            // First set of nodes are macro UE nodes moving within the larger bounding box
+            if (ueId < (params.ueNumPerMacroGnb * gnbSites * sectors))
+            {
+                ueNodesMacro.Add(ueNodes.Get (ueId));
+            }
+            // The rest are going to be initialised into smaller micro UE boundign boxes
+            else
+            {
+                ueNodesMicro.Add(ueNodes.Get (ueId));
+            }
+        }
+    }
+    else
+    {
+        ueNodesMacro.Add(ueNodes);
+    }
 
-    /***********************************************
-    * Bounding box for the topology
-    **********************************************/ 
+    /*********************************************************
+    * Macro UEs: Position Bounding box and Mobility model
+    **********************************************************/ 
 
     // Compute the bounding box for the scenario within which the UEs move
     double boundingBoxMinX = 0;
@@ -239,28 +209,11 @@ void CellularNetwork (const Parameters &params){
             << "(" << boundingBoxMinX << ", " << boundingBoxMaxY << ")  "
             << "(" << boundingBoxMaxX << ", " << boundingBoxMinY << ")  "
             << "(" << boundingBoxMaxX << ", " << boundingBoxMaxY << ")  "
-            //<< " UE height: " << ueZ
             << "\nArea X width: " << (boundingBoxMaxX - boundingBoxMinX) << " meters"
             << "  Area Y width: " << (boundingBoxMaxY - boundingBoxMinY) << " meters\n"
             << std::endl;
     
-    
-    /***********************************************
-    * Mobility model for UEs
-    **********************************************/ 
-    
-    double ueZ =params.ueHeight;
-
-    // Set these bounds for the mobility model of choice 
-    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinX",
-                          DoubleValue (boundingBoxMinX));
-    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinY",
-                          DoubleValue (boundingBoxMinY));
-    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxX",
-                          DoubleValue (boundingBoxMaxX));
-    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxY",
-                          DoubleValue (boundingBoxMaxY));
-    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::Z", DoubleValue (ueZ));
+    double ueZ =params.ueHeight;    
     
     // Create random initial position allocator for UEs within this box
     Ptr<PositionAllocator> positionAlloc = CreateObject<RandomBoxPositionAllocator> ();
@@ -276,17 +229,28 @@ void CellularNetwork (const Parameters &params){
     zPos->SetAttribute ("Constant", DoubleValue (ueZ));
     positionAlloc->SetAttribute ("Z", PointerValue (zPos));
 
+    // Set these bounds for the mobility model of choice 
+    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinX",
+                          DoubleValue (boundingBoxMinX));
+    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinY",
+                          DoubleValue (boundingBoxMinY));
+    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxX",
+                          DoubleValue (boundingBoxMaxX));
+    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxY",
+                          DoubleValue (boundingBoxMaxY));
+    Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::Z", DoubleValue (ueZ));
+    
     // Create mobility model object 
     MobilityHelper mobility;
     mobility.SetPositionAllocator (positionAlloc);
     
     // We create 2 mobility categories. One slow moving and the other fast
     // Iterate over UEs to put them in slow or fast categories
-    for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
+    for (uint32_t ueId = 0; ueId < ueNodesMacro.GetN (); ++ueId)
     {
-        Ptr<Node> node = ueNodes.Get (ueId);
+        Ptr<Node> node = ueNodesMacro.Get (ueId);
         //The first few UeIds are the fast moving ones 
-        if ( ueId < (params.fracFastUes*ueNodes.GetN ()) ) // use floor(params.fracFastUes*ueNodes.GetN ()) to allow only slow in 3 UE case 
+        if ( ueId < (params.fracFastUes*ueNodesMacro.GetN ()) ) // use floor(params.fracFastUes*ueNodesMacro.GetN ()) to allow only slow in 3 UE case 
         {
             // fast moving 
             mobility.SetMobilityModel ("ns3::SteadyStateRandomWaypointMobilityModel", 
@@ -307,15 +271,16 @@ void CellularNetwork (const Parameters &params){
     }
     
     /***********************************************
-    * Setup the LTE or NR RAN module
+    * Macro gNBs and all UEs: RAN settings
     **********************************************/
-
+  
     Ptr<PointToPointEpcHelper> epcHelper;
 
     NetDeviceContainer gnbSector1NetDev, gnbSector2NetDev, gnbSector3NetDev;
     std::vector<NetDeviceContainer *> gnbNdBySector {&gnbSector1NetDev, &gnbSector2NetDev, &gnbSector3NetDev};
-    NetDeviceContainer ueSector1NetDev, ueSector2NetDev,ueSector3NetDev;
-    std::vector<NetDeviceContainer *> ueNdBySector {&ueSector1NetDev, &ueSector2NetDev, &ueSector3NetDev};
+    NetDeviceContainer ueNetDevs;
+    //NetDeviceContainer ueSector1NetDev, ueSector2NetDev,ueSector3NetDev;
+    //std::vector<NetDeviceContainer *> ueNdBySector {&ueSector1NetDev, &ueSector2NetDev, &ueSector3NetDev};
 
     Ptr <LteHelper> lteHelper = nullptr;
     Ptr <NrHelper> nrHelper = nullptr;
@@ -328,17 +293,12 @@ void CellularNetwork (const Parameters &params){
                                                  gnbSector1Container,
                                                  gnbSector2Container,
                                                  gnbSector3Container,
-                                                 ueSector1Container,
-                                                 ueSector2Container,
-                                                 ueSector3Container,
+                                                 ueNodes,
                                                  epcHelper,
                                                  lteHelper,
                                                  gnbSector1NetDev,
                                                  gnbSector2NetDev,
-                                                 gnbSector3NetDev,
-                                                 ueSector1NetDev,
-                                                 ueSector2NetDev,
-                                                 ueSector3NetDev);
+                                                 gnbSector3NetDev);
     }
     else if (params.rat == "NR")
     {
@@ -351,17 +311,13 @@ void CellularNetwork (const Parameters &params){
                                                  gnbSector1Container,
                                                  gnbSector2Container,
                                                  gnbSector3Container,
-                                                 ueSector1Container,
-                                                 ueSector2Container,
-                                                 ueSector3Container,
+                                                 ueNodes,
                                                  epcHelper,
                                                  nrHelper,
                                                  gnbSector1NetDev,
                                                  gnbSector2NetDev,
                                                  gnbSector3NetDev,
-                                                 ueSector1NetDev,
-                                                 ueSector2NetDev,
-                                                 ueSector3NetDev,
+                                                 ueNetDevs,
                                                  params.enableUlPc,
                                                  params.scheduler,
                                                  params.bandwidthMHz,
@@ -373,16 +329,31 @@ void CellularNetwork (const Parameters &params){
     if ( (lteHelper == nullptr) && (nrHelper == nullptr) )
     {
         NS_ABORT_MSG ("Programming error: no valid helper");
-    }
-
-    allGnbNodes.Add (macroLayerGnbNodes);
+    } 
+    
+    NetDeviceContainer gnbNetDevs (gnbSector1NetDev, gnbSector2NetDev);
+    gnbNetDevs.Add (gnbSector3NetDev);
+    
     
     if (params.useMicroLayer) 
     {
-        /*************************************************************************
-        ************************* Micro layer********************************
-        **************************************************************************/    
-        // Create random initial position allocator for UEs within this box
+        /****************************************************
+        * Micro gNBs: creation
+        *****************************************************/   
+        microLayerGnbNodes.Create(params.numMicroCells);    
+        
+        /*********************************************************
+        * Micro gNBs: Position allocation 
+        **********************************************************/         
+        
+        Ptr<ListPositionAllocator> microPositionAlloc = CreateObject<ListPositionAllocator> ();  
+        microPositionAlloc->Add (Vector(-100,-175,7));
+        microPositionAlloc->Add (Vector(175,175,7));
+        microPositionAlloc->Add (Vector(190,-180,7));
+       
+        
+        // Random position allocation for micro basestations
+        /*
         Ptr<PositionAllocator> microPositionAlloc = CreateObject<RandomBoxPositionAllocator> ();
         Ptr<UniformRandomVariable> xPos = CreateObject<UniformRandomVariable> ();
         xPos->SetAttribute ("Min", DoubleValue (boundingBoxMinX));
@@ -396,94 +367,114 @@ void CellularNetwork (const Parameters &params){
         // make this a parameter and set it in the .h file
         zPos->SetAttribute ("Constant", DoubleValue (7.0));
         microPositionAlloc->SetAttribute ("Z", PointerValue (zPos));
-
-        microLayerGnbNodes.Create(params.numMicroCells); 
+        */
+      
         MobilityHelper microGnbMobility;
-        microGnbMobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-        // reusing the same position allocator as the one used for UEs 
-        // since the bounding box is the same 
         microGnbMobility.SetPositionAllocator (microPositionAlloc);
+        microGnbMobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
         microGnbMobility.Install (microLayerGnbNodes);
+    
+        /****************************************************
+        * Micro UEs: Position Bounding box and Mobility model
+        *****************************************************/  
+        
+        // Create a bounding box around each micro gNB for the "micro" UEs
+        for (uint32_t microCellIndex = 0; microCellIndex < microLayerGnbNodes.GetN (); ++microCellIndex)
+        {  
+            Ptr<Node> microGnb = microLayerGnbNodes.Get (microCellIndex); 
+            Vector microGnbpos = microGnb->GetObject<MobilityModel> ()->GetPosition ();
+            std::cout << "microGnb Position " << microGnbpos.x << "," << microGnbpos.y <<  "," << microGnbpos.z << std::endl; 
 
-        // I could also just use the same lte helper we had before since 
-        // those gnbs have already been installed 
-        // Configure a new lteHelper and install all the RAN stuff
-        // Is it okay to have 2 lteHelpers ?
+            // Compute the bounding box for the scenario within which the UEs move
+            double microCellRadius = 80;
+            double boundingBoxMinX = microGnbpos.x - microCellRadius;
+            double boundingBoxMinY = microGnbpos.y - microCellRadius;
+            double boundingBoxMaxX = microGnbpos.x + microCellRadius;
+            double boundingBoxMaxY = microGnbpos.y + microCellRadius;
+            std::cout << "Micro Topology Bounding box (x,y) for index : " << microCellIndex
+                << " (" << boundingBoxMinX << ", " << boundingBoxMinY << ")  "
+                << "(" << boundingBoxMinX << ", " << boundingBoxMaxY << ")  "
+                << "(" << boundingBoxMaxX << ", " << boundingBoxMinY << ")  "
+                << "(" << boundingBoxMaxX << ", " << boundingBoxMaxY << ")  "
+                << std::endl;
+ 
+            double ueZ =params.ueHeight;
+            
+            // Create random initial position allocator for UEs within this box
+            Ptr<PositionAllocator> positionAlloc = CreateObject<RandomBoxPositionAllocator> ();
+            Ptr<UniformRandomVariable> xPos = CreateObject<UniformRandomVariable> ();
+            xPos->SetAttribute ("Min", DoubleValue (boundingBoxMinX));
+            xPos->SetAttribute ("Max", DoubleValue (boundingBoxMaxX));
+            positionAlloc->SetAttribute ("X", PointerValue (xPos));
+            Ptr<UniformRandomVariable> yPos = CreateObject<UniformRandomVariable> ();
+            yPos->SetAttribute ("Min", DoubleValue (boundingBoxMinY));
+            yPos->SetAttribute ("Max", DoubleValue (boundingBoxMaxY));
+            positionAlloc->SetAttribute ("Y", PointerValue (yPos));
+            Ptr<ConstantRandomVariable> zPos = CreateObject<ConstantRandomVariable> ();
+            zPos->SetAttribute ("Constant", DoubleValue (ueZ));
+            positionAlloc->SetAttribute ("Z", PointerValue (zPos));
+            
+            // Set these bounds for the mobility model of choice 
+            Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinX",
+                                DoubleValue (boundingBoxMinX));
+            Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MinY",
+                                DoubleValue (boundingBoxMinY));
+            Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxX",
+                                DoubleValue (boundingBoxMaxX));
+            Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::MaxY",
+                                DoubleValue (boundingBoxMaxY));
+            Config::SetDefault ("ns3::SteadyStateRandomWaypointMobilityModel::Z", DoubleValue (ueZ));
 
-        Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (params.microCellTxPower)); // Don't know what this should be set to 
+            // Create mobility model object 
+            MobilityHelper mobility;
+            mobility.SetPositionAllocator (positionAlloc);
+            mobility.SetMobilityModel ("ns3::SteadyStateRandomWaypointMobilityModel", 
+                                       "MaxSpeed", DoubleValue (params.microUeMaxSpeed), 
+                                       "MinSpeed", DoubleValue (params.microUeMinSpeed) );
+            
+            // Install this for the UEs that are to be in the bounding box of this micro BS 
+            for (uint32_t ueId = microCellIndex*params.ueNumPerMicroGnb; ueId < microCellIndex*params.ueNumPerMicroGnb +  params.ueNumPerMicroGnb; ++ueId)
+            {
+                Ptr<Node> node = ueNodesMicro.Get (ueId);  
+                mobility.Install(node);
+            }
+        } // end of for over micro cells 
+        
+        allGnbNodes.Add (microLayerGnbNodes);  
+        /***********************************************
+        * Micro gNBs: RAN settings
+        **********************************************/        
+        // Some settings are borrowed from the macro case so it is not being set again here
+        // e.g. handover algo, scheduler type etc.
+        Config::SetDefault ("ns3::LteEnbPhy::TxPower", DoubleValue (params.microCellTxPower)); 
 
-        /*
-        Ptr<LteHelper> microLteHelper = CreateObject<LteHelper> ();
-
-        // Does this work ? Will it get attached to the same EPC as the macro layer ? 
-
-        microLteHelper->SetEpcHelper (epcHelper);
-
-        // Do these without setting default 
-
-        // same as macro layer can apply
-        /////////////////////////Config::SetDefault ("ns3::LteRlcUm::MaxTxBufferSize", UintegerValue (10*1024)); //default is 10*1024 = 10KB
-
-        lteHelmicroLteHelperper->SetAttribute ("PathlossModel", StringValue ("ns3::ThreeGppUmiStreetCanyonPropagationLossModel"));
-
-        if (params.handoverAlgo == "A3Rsrp")
-        {
-            microLteHelper->SetHandoverAlgorithmType ("ns3::A3RsrpHandoverAlgorithm");
-            microLteHelper->SetHandoverAlgorithmAttribute ("Hysteresis", 
-                                                    DoubleValue (6.0)); // used to be 3
-            microLteHelper->SetHandoverAlgorithmAttribute ("TimeToTrigger",
-                                                  TimeValue (MilliSeconds (500))); // used to be 256 
-        }
-        else if (params.handoverAlgo == "A2A4Rsrq")
-        {
-            microLteHelper->SetHandoverAlgorithmType ("ns3::A2A4RsrqHandoverAlgorithm");
-            microLteHelper->SetHandoverAlgorithmAttribute ("ServingCellThreshold",
-                                                UintegerValue (30));
-            microLteHelper->SetHandoverAlgorithmAttribute ("NeighbourCellOffset",
-                                                UintegerValue (1));
-        }
-        microLteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
-        if (params.scheduler == "PF")
-        {
-            microLteHelper->SetSchedulerType ("ns3::PfFfMacScheduler");
-        }
-        else if (params.scheduler == "RR")
-        {
-            microLteHelper->SetSchedulerType ("ns3::RrFfMacScheduler");
-        }*/
-
-
-
-        // same as macro layer can apply
-        //Config::SetDefault ("ns3::LteUePhy::EnableUplinkPowerControl", BooleanValue (params.enableUlPc));
-        // antenna stuff
-        // Not doing anything since default is omnidirectional (is it ? or is it isotropic)
         uint32_t microDlRB;
         uint32_t microUlRB;
-      if (params.microBandwidthMHz == 20)
+        if (params.microBandwidthMHz == 20)
         {
-          microDlRB = 100;
-          microUlRB = 100;
+            microDlRB = 100;
+            microUlRB = 100;
         }
-      else if (params.microBandwidthMHz == 15)
+        else if (params.microBandwidthMHz == 15)
         {
-          microDlRB = 75;
-          microUlRB = 75;
+            microDlRB = 75;
+            microUlRB = 75;
         }
-      else if (params.microBandwidthMHz == 10)
+        else if (params.microBandwidthMHz == 10)
         {
-          microDlRB = 50;
-          microUlRB = 50;
+            microDlRB = 50;
+            microUlRB = 50;
         }
-      else if (params.microBandwidthMHz == 5)
+        else if (params.microBandwidthMHz == 5)
         {
-          microDlRB = 25;
-          microUlRB = 25;
+            microDlRB = 25;
+            microUlRB = 25;
         }
-      else
+        else
         {
-          NS_ABORT_MSG ("The configured micro layer bandwidth in MHz not supported:" << params.microBandwidthMHz);
+            NS_ABORT_MSG ("The configured micro layer bandwidth in MHz not supported:" << params.microBandwidthMHz);
         }
+        
         lteHelper->SetEnbDeviceAttribute ("DlBandwidth", UintegerValue (microDlRB));
         lteHelper->SetEnbDeviceAttribute ("UlBandwidth", UintegerValue (microUlRB));
         
@@ -492,29 +483,39 @@ void CellularNetwork (const Parameters &params){
             lteHelper->SetEnbDeviceAttribute ("DlEarfcn", UintegerValue (2850)); // 2620 MHz, band 7
             lteHelper->SetEnbDeviceAttribute ("UlEarfcn", UintegerValue (20850)); // 2620 MHz, band 7
         }
-        
-        // If using lteHelper I need to reset the antenna stuff as well... 
+         
         lteHelper->SetEnbAntennaModelType ("ns3::IsotropicAntennaModel");
-        lteHelper->SetEnbAntennaModelAttribute ("Gain", DoubleValue (0));
 
-        // install netDev
         NetDeviceContainer microLayerGnbLteDevs = lteHelper->InstallEnbDevice (microLayerGnbNodes);
-        //Ptr<LteEnbPhy> enbPhy = microLayerGnbLteDevs->GetPhy();
-        //enbPhy->SetAttribute("TxPower", DoubleValue (23.0));
-        // Install internet 
-        // figure out the epc connection etc. 
-        // connect to remote host 
-
-
-        allGnbNodes.Add (microLayerGnbNodes);   
-        // global declaration to make things easy   
-        //NUM_GNBS = allGnbNodes.GetN();
-
-        /*************************************************************************
-        ************************* Micro layer END ********************************
-    **************************************************************************/
+        randomStream += lteHelper->AssignStreams (microLayerGnbLteDevs, randomStream); 
+    } // end of if add micro layer 
+    
+    ueNetDevs = lteHelper->InstallUeDevice (ueNodes);  
+    
+    randomStream += lteHelper->AssignStreams (ueNetDevs, randomStream);   
+    randomStream += lteHelper->AssignStreams (gnbNetDevs, randomStream); 
+    
+    // This part is for asserts or sanity checks   
+    for (auto nd = ueNetDevs.Begin (); nd != ueNetDevs.End (); ++nd)
+    {
+        auto ueNetDevice = DynamicCast<LteUeNetDevice> (*nd);
+        NS_ASSERT (ueNetDevice->GetCcMap ().size () == 1);
+        auto uePhy = ueNetDevice->GetPhy ();
     }
     
+    std::cout << "All gNB nodes created" << std::endl;
+    for (uint32_t gnb_idx = 0; gnb_idx < allGnbNodes.GetN (); ++gnb_idx)
+    {
+        Ptr<Node> gnb = allGnbNodes.Get (gnb_idx);  
+
+        std::cout << "gnb_idx: " << gnb_idx 
+            << " cellId: " << gnb->GetDevice (0)->GetObject<LteEnbNetDevice> ()->GetCellId()
+            << std::endl;
+    }
+
+    /****************************************************
+    * Install Internet for all Nodes
+    *****************************************************/
     
     // create the internet and install the IP stack on the UEs
     // get SGW/PGW and create a single RemoteHost
@@ -538,13 +539,7 @@ void CellularNetwork (const Parameters &params){
     Ptr<Ipv4StaticRouting> remoteHostStaticRouting = ipv4RoutingHelper.GetStaticRouting (remoteHost->GetObject<Ipv4> ());
     remoteHostStaticRouting->AddNetworkRouteTo (Ipv4Address ("7.0.0.0"), Ipv4Mask ("255.0.0.0"), 1);
     internet.Install (ueNodes);
-
-    NetDeviceContainer gnbNetDevs (gnbSector1NetDev, gnbSector2NetDev);
-    gnbNetDevs.Add (gnbSector3NetDev);
-    NetDeviceContainer ueNetDevs (ueSector1NetDev, ueSector2NetDev); 
-    ueNetDevs.Add (ueSector3NetDev);
-    // CHECK IF THIS IS THE REASON FOR MISMATCH 
-    //ueIpIfaces {epcHelper->AssignUeIpv4Address (ueNetDevs)}
+    
     ueIpIfaces = epcHelper->AssignUeIpv4Address (ueNetDevs);
     Ipv4Address remoteHostAddr = internetIpIfaces.GetAddress (1);
 
@@ -555,45 +550,18 @@ void CellularNetwork (const Parameters &params){
         ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
     }
 
+    /****************************************************
+    * Attach UEs to gNBs
+    *****************************************************/      
     
     if (lteHelper != nullptr)
-    {
-        // This does not work. It connects all UEs to CellId 1
-        //lteHelper->AttachToClosestEnb (ueNetDevs, gnbNetDevs); 
+    { 
         lteHelper->Attach (ueNetDevs);
     }
     else if (nrHelper != nullptr)
     {
         nrHelper->AttachToClosestEnb (ueNetDevs, gnbNetDevs);
     }
-    
-    
-    // Attach UEs to their gNB. Try to attach them per cellId order
-    /*for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
-    {
-        auto cellId = scenario->GetCellIndex (ueId);
-        Ptr<NetDevice> gnbNetDev = gnbNetDevs.Get (cellId);
-        Ptr<NetDevice> ueNetDev = ueNetDevs.Get (ueId);
-        if (lteHelper != nullptr)
-        {
-            // This call attaches the ues in the ue container to the 
-            // gnbs in the gnb container
-            lteHelper->Attach (ueNetDev, gnbNetDev);
-            
-            // This call attaches the ues automatically to the best gnb available to it 
-            //lteHelper->Attach (ueNetDev);
-        }
-        else if (nrHelper != nullptr)
-        {
-            nrHelper->AttachToEnb (ueNetDev, gnbNetDev);
-            //nrHelper->Attach (ueNetDev);
-            // UL phy
-            uint32_t bwp = (params.operationMode == "FDD" ? 1 : 0);
-            auto ueUlPhy {nrHelper->GetUePhy (ueNetDev, bwp)};
-        }
-    }*/
-
-
 
     /***********************************************
     * Traffic generation applications
@@ -605,6 +573,7 @@ void CellularNetwork (const Parameters &params){
     uint16_t dlDelayPortNum = 18000;
     uint16_t dashPortNum = 15000;
     uint16_t vrPortNum = 16000;
+    //uint16_t httpPortNum = 31000;
 
     uint32_t echoPacketCount = 0xFFFFFFFF;
     uint32_t delayPacketCount = 0xFFFFFFFF; 
@@ -648,8 +617,8 @@ void CellularNetwork (const Parameters &params){
     UdpServerHelper ulFlowPacketSink (ulFlowPortNum);
     UdpServerHelper dlFlowPacketSink (dlFlowPortNum);
     ThreeGppHttpServerHelper httpServer (remoteHostAddr);
-    DashServerHelper dashServer ("ns3::TcpSocketFactory", 
-                                 InetSocketAddress (Ipv4Address::GetAny (), dashPortNum));
+    //DashServerHelper dashServer ("ns3::TcpSocketFactory", 
+    //                             InetSocketAddress (Ipv4Address::GetAny (), dashPortNum));
     UdpEchoServerHelper echoServer (echoPortNum);
     //vr  
     Ptr<UniformRandomVariable> vrStart = CreateObject<UniformRandomVariable> ();
@@ -676,10 +645,10 @@ void CellularNetwork (const Parameters &params){
         //httpVariables->SetMainObjectSizeStdDev (params.httpMainObjStd); // 40kB
         
     }
-    if(params.traceDash)
+    /*if(params.traceDash)
     {
         serverApps.Add (dashServer.Install (remoteHost)); // appId updated on remoteHost
-    }
+    }*/
     if(params.traceRtt)
     {
         serverApps.Add (echoServer.Install (remoteHost)); // appId updated on remoteHost
@@ -695,7 +664,7 @@ void CellularNetwork (const Parameters &params){
     UdpClientHelper ulDelayClient;
     UdpClientHelper dlDelayClient;
     UdpEchoClientHelper echoClient (remoteHostAddr, echoPortNum);
-    DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum), params.abr);
+    //DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum), params.abr);
     ThreeGppHttpClientHelper httpClient (remoteHostAddr);
     //vr
     BurstSinkHelper burstSinkHelper ("ns3::UdpSocketFactory",
@@ -736,14 +705,14 @@ void CellularNetwork (const Parameters &params){
         echoClient.SetAttribute ("Interval", TimeValue (params.echoInterPacketInterval));
         echoClient.SetAttribute ("PacketSize", UintegerValue (params.echoPacketSize));
     }
-    if(params.traceDash)
+    /*if(params.traceDash)
     {
         // Configure DASH client application 
         dashClient.SetAttribute ("VideoId", UintegerValue (1)); // VideoId should be positive
         dashClient.SetAttribute ("TargetDt", TimeValue (Seconds (params.targetDt)));
         dashClient.SetAttribute ("window", TimeValue (Seconds (params.window)));
-        dashClient.SetAttribute ("bufferSpace", UintegerValue (params.bufferSpace));
-    }
+        dashClient.SetAttribute ("bufferSpace", UintegerValue (params.videoBufferSize));
+    }*/
     if(params.traceHttp)
     {
         // Configure http client application
@@ -757,10 +726,14 @@ void CellularNetwork (const Parameters &params){
     Ptr<UniformRandomVariable> startRng = CreateObject<UniformRandomVariable> ();
     startRng->SetStream (RngSeedManager::GetRun ());
 
-
-    for (uint32_t ueId = 0; ueId < ueNodes.GetN (); ++ueId)
+    
+    /***********************************************
+    * Iterate through macro UEs and install apps 
+    **********************************************/    
+    
+    for (uint32_t ueId = 0; ueId < ueNodesMacro.GetN (); ++ueId)
     {
-        Ptr<Node> node = ueNodes.Get (ueId);
+        Ptr<Node> node = ueNodesMacro.Get (ueId);
         Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
         Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
         Ipv4Address addr = iaddr.GetLocal ();
@@ -780,10 +753,6 @@ void CellularNetwork (const Parameters &params){
                               remoteHost, remoteHostAddr, params.appStartTime,
                               startRng, params.appGenerationTime);
             clientApps.Add (appsClass3.first);
-            // Print the IMSI of the ues that are doing this	
-            /*std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                << " Ip_addr: " << addr 
-                << " has UL and DL Delay app installed " << std::endl;*/
         }
         if(params.traceRtt)
         {
@@ -792,9 +761,6 @@ void CellularNetwork (const Parameters &params){
                               params.appStartTime,
                               startRng, params.appGenerationTime);
             clientApps.Add (appsClass1.first);
-            /*std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId)  
-              << " IP_addr: " << addr
-              <<" has RTT app installed" << std::endl;*/
         } 
         // Install full buffer BulkSend traffic on only one UE to test the 
         // TCP throughput achieved as the UE moves within the topology
@@ -814,7 +780,7 @@ void CellularNetwork (const Parameters &params){
                                                    InetSocketAddress (Ipv4Address::GetAny (), port));
                 ulPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));   
                 serverApps.Add (ulPacketSinkHelper.Install (remoteHost));
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
                     << " IP_addr: " << addr 
                     <<" has UL Throughput measurement (BulkSend) app installed" << std::endl;
             }
@@ -833,7 +799,7 @@ void CellularNetwork (const Parameters &params){
                                                    InetSocketAddress (Ipv4Address::GetAny (), port));
                 dlPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true)); 
                 serverApps.Add (dlPacketSinkHelper.Install (node));
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                std::cout << " IMSI: " << GetImsi_from_node(node)  
                     << " IP_addr: " << addr 
                     <<" has DL Throughput measurement (BulkSend) app installed" << std::endl;
                 
@@ -843,24 +809,15 @@ void CellularNetwork (const Parameters &params){
         
         if (params.traceVr) 
         {
-          // Install VR app on the last n UEs whihc are slow moving UEs 
-            if (ueId >= (ueNodes.GetN ()-params.numVrUes) )
+          // Install VR app on the last n UEs which are slow moving UEs 
+            if (ueId >= (ueNodesMacro.GetN ()-params.numMacroVrUes) )
             {
                 //Install VR and continue so that the regular logic is not encountered
-                // Iterate over the UEs that are selected to have a VR app on them 
-                // These UEs are slow moving UEs close to micro layer BSs with their higher BW
-                //for (uint32_t ueId = 0; ueId < 0; ++ueId)
-                //{
-                //Ptr<Node> node = ueNodes.Get (ueId);
-                //Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
-                //Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
-                //Ipv4Address addr = iaddr.GetLocal ();
-
                 // Random sample for the start time fo the VR session for each UE  
                 double vrStartTime = vrStart->GetValue();
                 // The sender of VR traffic to be installed on remoteHost
                 BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
-                                           InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
+                                           InetSocketAddress (addr, vrPortNum)); 
                 burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
                 burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
                                                 "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
@@ -870,7 +827,7 @@ void CellularNetwork (const Parameters &params){
                 // The receiver of the VR traffic to be installed on UEs
                 clientApps.Add (burstSinkHelper.Install (node));
                 // Print the IMSI of the ues that are doing this	
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
                     << " Ip_addr: " << addr 
                     << " has VR app installed " << std::endl;
                 //}
@@ -881,114 +838,274 @@ void CellularNetwork (const Parameters &params){
         // These are the apps that are on a subset of devices 
         if (ueId % 5 == 0)
         {
-
-        } 
-
-
-        else if (ueId % 2 == 0)
-        {
-            // These UEs do video + background CBR traffic + delay measurement
+            // This is on 20% of the macro devices
+            // These UEs do video + delay probes
             if(params.traceDash)
             {
+                DashServerHelper dashServer ("ns3::TcpSocketFactory", 
+                                 InetSocketAddress (Ipv4Address::GetAny (), dashPortNum+ueId));
+                serverApps.Add (dashServer.Install (remoteHost)); // appId updated on remoteHost
+                DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum+ueId), params.abr);
+                // Configure DASH client application 
+                dashClient.SetAttribute ("VideoId", UintegerValue (1)); // VideoId should be positive
+                dashClient.SetAttribute ("TargetDt", TimeValue (Seconds (params.targetDt)));
+                dashClient.SetAttribute ("window", TimeValue (Seconds (params.window)));
+                dashClient.SetAttribute ("bufferSpace", UintegerValue (params.videoBufferSize));
+
+                
                 auto appsClass6 = InstallDashApps (node,
                                   &dashClient,
                                   params.appStartTime,
                                   startRng, params.appGenerationTime);
                 clientApps.Add (appsClass6.first);
                 // Print the IMSI of the ues that are doing this
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId)  
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
                 << " IP_addr: " << addr
                 <<" has DASH app installed" << std::endl;
             }
-            if(params.traceFlow)
-            {
-                serverApps.Add (dlFlowPacketSink.Install (node)); 
-                auto appsClass4 = InstallUlFlowTrafficApps (node,
-                                  &ulFlowClient,
-                                  remoteHost, remoteHostAddr, params.appStartTime,
-                                  startRng, params.appGenerationTime);
-                clientApps.Add (appsClass4.first);
-                auto appsClass5 = InstallDlFlowTrafficApps (node, addr,
-                                  &dlFlowClient,
-                                  remoteHost, remoteHostAddr, params.appStartTime,
-                                  startRng, params.appGenerationTime);
-                clientApps.Add (appsClass5.first);
-                // Print the IMSI of the ues that are doing this	
-                std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                << " Ip_addr: " << addr 
-                << " has UL and DL FLOW app installed " << std::endl;
-            }
+        } 
+        else if (ueId % 2 == 0)
+        {
+            // This is on 40% of the devices
+            // only delay probes
+            onlyDelayUes.push_back (GetImsi_from_node(node));
         }
-
-
         else 
         {
-                // These UEs do web browsing + background CBR traffic + delay measurement
-                if(params.traceHttp)
-                {
-                    auto appsClass6 = InstallHttpApps (node,
-                                  &httpClient,
+            // This is on 40% of the devices
+            // These UEs do web browsing + delay measurement
+            if(params.traceHttp)
+            {   
+                // if dedicated server for each client 
+                /*ThreeGppHttpClientHelper httpClient (remoteHostAddr);
+                httpClient.SetAttribute("RemoteServerPort", UintegerValue (httpPortNum+ueId));
+                ThreeGppHttpServerHelper httpServer (remoteHostAddr);
+                httpServer.SetAttribute("LocalPort", UintegerValue (httpPortNum+ueId));
+                serverApps.Add (httpServer.Install (remoteHost));*/
+                
+                //option 2
+                /*Ptr<ThreeGppHttpServer> httpCli = s ->GetObject<ThreeGppHttpServer> ();
+                PointerValue varPtr;
+                httpCli->GetAttribute ("Variables", varPtr);
+                Ptr<ThreeGppHttpVariables> httpVariables = varPtr.Get<ThreeGppHttpVariables> ();
+                httpVariables->SetMainObjectSizeMean (params.httpMainObjMean); // 100kB*/
+                
+                //option 1
+                Ptr<ThreeGppHttpVariables> httpVariables = CreateObject<ThreeGppHttpVariables> ();
+                randomStream += httpVariables->AssignStreams(randomStream);
+                httpClient.SetAttribute("Variables",  PointerValue (httpVariables));
+                
+                auto appsClass6 = InstallHttpApps (node,
+                              &httpClient,
+                              params.appStartTime,
+                              startRng, params.appGenerationTime);
+                clientApps.Add (appsClass6.first);
+                // Print the IMSI of the ues that are doing this
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
+                  << " IP_addr: " << addr 
+                  << " has HTTP app installed" << std::endl;
+            }
+        }
+    } // end of for over macro layer UEs
+   
+    /***********************************************
+    * Iterate through micro UEs and install apps 
+    **********************************************/ 
+    
+    for (uint32_t ueId = 0; ueId < ueNodesMicro.GetN (); ++ueId)
+    {
+        Ptr<Node> node = ueNodesMicro.Get (ueId);
+        Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
+        Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
+        Ipv4Address addr = iaddr.GetLocal ();
+
+        // Client apps
+        // These are the apps that are on all devices 
+        if (params.traceDelay)
+        {
+            serverApps.Add (dlDelayPacketSink.Install (node));  
+            auto appsClass2 = InstallUlDelayTrafficApps (node,
+                                  &ulDelayClient,
+                                  remoteHost, remoteHostAddr, params.appStartTime,
+                                  startRng, params.appGenerationTime);
+            clientApps.Add (appsClass2.first);
+            auto appsClass3 = InstallDlDelayTrafficApps (node, addr,
+                              &dlDelayClient,
+                              remoteHost, remoteHostAddr, params.appStartTime,
+                              startRng, params.appGenerationTime);
+            clientApps.Add (appsClass3.first);
+        }
+        if(params.traceRtt)
+        {
+            auto appsClass1 = InstallUdpEchoApps (node,
+                              &echoClient,
+                              params.appStartTime,
+                              startRng, params.appGenerationTime);
+            clientApps.Add (appsClass1.first);
+        } 
+        // Install full buffer BulkSend traffic on only one UE to test the 
+        // TCP throughput achieved as the UE moves within the topology
+        // This should be installed on one of the fast speed UEs so that it can 
+        // cover more distance and visit more cells 
+        if(params.traceUlThput)
+        {
+            if(ueId == 0)
+            {
+                uint32_t port = 20000;
+                BulkSendHelper ulBulkSendHelper ("ns3::TcpSocketFactory",
+                                             InetSocketAddress (remoteHostAddr, port));
+                ulBulkSendHelper.SetAttribute ("MaxBytes", UintegerValue (0)); // send forever
+                ulBulkSendHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));
+                clientApps.Add (ulBulkSendHelper.Install (node));
+                PacketSinkHelper ulPacketSinkHelper ("ns3::TcpSocketFactory",
+                                                   InetSocketAddress (Ipv4Address::GetAny (), port));
+                ulPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));   
+                serverApps.Add (ulPacketSinkHelper.Install (remoteHost));
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
+                    << " IP_addr: " << addr 
+                    <<" has UL Throughput measurement (BulkSend) app installed" << std::endl;
+            }
+        }
+        if(params.traceDlThput)
+        {
+            if(ueId == 0)
+            {
+                uint32_t port = 19000;
+                BulkSendHelper dlBulkSendHelper ("ns3::TcpSocketFactory",
+                                             InetSocketAddress (addr, port));
+                dlBulkSendHelper.SetAttribute ("MaxBytes", UintegerValue (0)); // send forever
+                dlBulkSendHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true));
+                clientApps.Add (dlBulkSendHelper.Install (remoteHost));
+                PacketSinkHelper dlPacketSinkHelper ("ns3::TcpSocketFactory",
+                                                   InetSocketAddress (Ipv4Address::GetAny (), port));
+                dlPacketSinkHelper.SetAttribute ("EnableSeqTsSizeHeader", BooleanValue (true)); 
+                serverApps.Add (dlPacketSinkHelper.Install (node));
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
+                    << " IP_addr: " << addr 
+                    <<" has DL Throughput measurement (BulkSend) app installed" << std::endl;
+                
+            }
+        }
+        
+        
+        if (params.traceVr) 
+        {
+          // Install VR app on the last n UEs which are slow moving UEs 
+            if (ueId >= (ueNodesMicro.GetN ()-params.numMicroVrUes) )
+            {
+                //Install VR and continue so that the regular logic is not encountered
+                // Random sample for the start time fo the VR session for each UE  
+                double vrStartTime = vrStart->GetValue();
+                // The sender of VR traffic to be installed on remoteHost
+                BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
+                                           InetSocketAddress (addr, vrPortNum)); 
+                burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
+                burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
+                                                "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
+                                                "StartTime", DoubleValue (vrStartTime));
+                vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
+                serverApps.Add (burstyHelper.Install (remoteHost));
+                // The receiver of the VR traffic to be installed on UEs
+                clientApps.Add (burstSinkHelper.Install (node));
+                // Print the IMSI of the ues that are doing this	
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
+                    << " Ip_addr: " << addr 
+                    << " has VR app installed " << std::endl;
+                continue;
+            }
+        }
+        
+        // These are the apps that are on a subset of devices 
+        if (ueId % 5 == 0)
+        {
+            // This is on 20% of the micro devices
+            // These UEs do web browsing + delay measurement
+            if(params.traceHttp)
+            {
+                
+                /*ThreeGppHttpServerHelper httpServer (remoteHostAddr);
+                httpServer.SetAttribute("LocalPort", UintegerValue (httpPortNum+100+ueId));
+                serverApps.Add (httpServer.Install (remoteHost));
+                
+                ThreeGppHttpClientHelper httpClient (remoteHostAddr);
+                httpClient.SetAttribute("RemoteServerPort", UintegerValue (httpPortNum+100+ueId));*/
+                
+                //option 1
+                Ptr<ThreeGppHttpVariables> httpVariables = CreateObject<ThreeGppHttpVariables> ();
+                randomStream += httpVariables->AssignStreams(randomStream);
+                httpClient.SetAttribute("Variables",  PointerValue (httpVariables));
+                
+                auto appsClass6 = InstallHttpApps (node,
+                              &httpClient,
+                              params.appStartTime,
+                              startRng, params.appGenerationTime);
+                clientApps.Add (appsClass6.first);
+                // Print the IMSI of the ues that are doing this
+                std::cout << " IMSI: " << GetImsi_from_node(node) 
+                  << " IP_addr: " << addr 
+                  << " has HTTP app installed" << std::endl;
+            }
+        } 
+        else if (ueId % 2 == 0)
+        {
+            // This is on 40% of the micro devices
+            // These have only delay probes
+            onlyDelayUes.push_back (GetImsi_from_node(node));
+        }
+        else 
+        {
+            // This is on 40% of the micro devices
+            // These UEs do video + delay measurement
+            if(params.traceDash)
+            {
+                DashServerHelper dashServer ("ns3::TcpSocketFactory", 
+                                 InetSocketAddress (Ipv4Address::GetAny (), dashPortNum+100+ueId));
+                serverApps.Add (dashServer.Install (remoteHost)); // appId updated on remoteHost
+                DashClientHelper dashClient ("ns3::TcpSocketFactory", InetSocketAddress (remoteHostAddr, dashPortNum+100+ueId), params.abr);
+                // Configure DASH client application 
+                dashClient.SetAttribute ("VideoId", UintegerValue (1)); // VideoId should be positive
+                dashClient.SetAttribute ("TargetDt", TimeValue (Seconds (params.targetDt)));
+                dashClient.SetAttribute ("window", TimeValue (Seconds (params.window)));
+                dashClient.SetAttribute ("bufferSpace", UintegerValue (params.videoBufferSize));
+
+                
+                auto appsClass6 = InstallDashApps (node,
+                                  &dashClient,
                                   params.appStartTime,
                                   startRng, params.appGenerationTime);
-                    clientApps.Add (appsClass6.first);
-                    // Print the IMSI of the ues that are doing this
-                    std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                      << " IP_addr: " << addr 
-                      << " has HTTP app installed" << std::endl;
-                }
-                if(params.traceFlow)
-                {
-                    serverApps.Add (dlFlowPacketSink.Install (node));
-                    auto appsClass4 = InstallUlFlowTrafficApps (node,
-                                      &ulFlowClient,
-                                      remoteHost, remoteHostAddr, params.appStartTime,
-                                      startRng, params.appGenerationTime);
-                    clientApps.Add (appsClass4.first);
-                    auto appsClass5 = InstallDlFlowTrafficApps (node, addr,
-                                      &dlFlowClient,
-                                      remoteHost, remoteHostAddr, params.appStartTime,
-                                      startRng, params.appGenerationTime);
-                    clientApps.Add (appsClass5.first);
-                    // Print the IMSI of the ues that are doing this	
-                    std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                    << " Ip_addr: " << addr 
-                    << " has UL and DL FLOW app installed " << std::endl;
-                }
+                clientApps.Add (appsClass6.first);
+                // Print the IMSI of the ues that are doing this
+                std::cout << " IMSI: " << GetImsi_from_node(node)  
+                << " IP_addr: " << addr
+                <<" has DASH app installed" << std::endl;
+            }
         }
     } // end of for over UEs
+
+/*
+if(params.traceFlow)
+{
+    serverApps.Add (dlFlowPacketSink.Install (node));
+    auto appsClass4 = InstallUlFlowTrafficApps (node,
+                      &ulFlowClient,
+                      remoteHost, remoteHostAddr, params.appStartTime,
+                      startRng, params.appGenerationTime);
+    clientApps.Add (appsClass4.first);
+    auto appsClass5 = InstallDlFlowTrafficApps (node, addr,
+                      &dlFlowClient,
+                      remoteHost, remoteHostAddr, params.appStartTime,
+                      startRng, params.appGenerationTime);
+    clientApps.Add (appsClass5.first);
+    // Print the IMSI of the ues that are doing this	
+    std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_node(node) 
+    << " Ip_addr: " << addr 
+    << " has UL and DL FLOW app installed " << std::endl;
+}*/
     
-/*    if(params.traceVr)
-    {
-        // Iterate over the UEs that are selected to have a VR app on them 
-        // These UEs are slow moving UEs close to micro layer BSs with their higher BW
-        for (uint32_t ueId = 0; ueId < 0; ++ueId)
-        {
-            Ptr<Node> node = ueNodes.Get (ueId);
-            Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
-            Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0); 
-            Ipv4Address addr = iaddr.GetLocal ();
-
-            // Random sample for the start time fo the VR session for each UE  
-            double vrStartTime = vrStart->GetValue();
-            // The sender of VR traffic to be installed on remoteHost
-            BurstyHelper burstyHelper ("ns3::UdpSocketFactory", 
-                                       InetSocketAddress (GetIpAddrFromUeId(ueId), vrPortNum)); 
-            burstyHelper.SetAttribute ("FragmentSize", UintegerValue (1200));
-            burstyHelper.SetBurstGenerator ("ns3::TraceFileBurstGenerator", 
-                                            "TraceFile", StringValue (traceFolder + vrTraceFiles[vrTraceFileIndex]), 
-                                            "StartTime", DoubleValue (vrStartTime));
-            vrTraceFileIndex = (vrTraceFileIndex + 1)%8;
-            serverApps.Add (burstyHelper.Install (remoteHost));
-            // The receiver of the VR traffic to be installed on UEs
-            clientApps.Add (burstSinkHelper.Install (node));
-            // Print the IMSI of the ues that are doing this	
-            std::cout << "ueId: " << ueId << " IMSI: " << GetImsi_from_ueId(ueId) 
-                << " Ip_addr: " << addr 
-                << " has VR app installed " << std::endl;
-        }
-    }*/
-
-
+    
+    
+    
+    
     // Server Start  
     serverApps.Start (params.appStartTime);
     // client apps are started individually using the Install function 
@@ -996,18 +1113,12 @@ void CellularNetwork (const Parameters &params){
     // Setup X2 interface to enable handover   
     if (lteHelper != nullptr)
     {
-        //lteHelper->AddX2Interface (macroLayerGnbNodes);
         lteHelper->AddX2Interface (allGnbNodes);
-        /*if (microLteHelper != nullptr)
-        {         
-            microLteHelper->AddX2Interface (microLayerGnbNodes);
-        }   */
     }
     else if (nrHelper != nullptr)
     {
         // BooHoo Handover is not yet supported for NR 
     }
-
 
     // enable the RAN traces provided by the LTE or NR module
     if (params.traces == true)
@@ -1093,7 +1204,7 @@ void CellularNetwork (const Parameters &params){
     Simulator::Schedule (MilliSeconds(500), &LogPosition, mobStream);
     // To print info, some of which is only available a few milliseconds 
     // after the simulation is setup and UEs attached
-    Simulator::Schedule (MilliSeconds(100), &ScenarioInfo, scenario);
+    Simulator::Schedule (MilliSeconds(400), &ScenarioInfo, scenario);
     
     /*
     // To schedule on/off of apps that I would like to pause and resume randomly 

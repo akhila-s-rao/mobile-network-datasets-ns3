@@ -58,10 +58,13 @@ main (int argc, char *argv[])
                 params.numMicroCells);  
     cmd.AddValue ("microCellTxPower",
                 "Transmit power of the base stations in the micro cell layer",
-                params.microCellTxPower); 
-    cmd.AddValue ("ueNumPergNb",
-                "The number of UE per cell or gNB in multiple-ue topology",
-                params.ueNumPergNb);
+                params.microCellTxPower);
+    cmd.AddValue ("ueNumPerMacroGnb",
+                "The number of UEs per cell in the macro layer",
+                params.ueNumPerMacroGnb);
+    cmd.AddValue ("ueNumPerMicroGnb",
+                "The number of UEs per cell in the micro layer",
+                params.ueNumPerMicroGnb);  
     cmd.AddValue ("siteFile",
                 "Path to file of tower coordinates (instead of hexagonal grid)",
                 params.baseStationFile);
@@ -123,9 +126,12 @@ main (int argc, char *argv[])
     cmd.AddValue ("appVr",
                 "Install the virtual reality (VR) streaming application",
                 params.traceVr);
-    cmd.AddValue ("numVrUes",
-                "Number of UEs that have the VR app installed on them",
-                params.numVrUes);
+    cmd.AddValue ("numMacroVrUes",
+                "Number of UEs in the macro layer that have the VR app installed on them",
+                params.numMacroVrUes);
+    cmd.AddValue ("numMicroVrUes",
+                "Number of UEs in the micro layer that have the VR app installed on them",
+                params.numMicroVrUes);
     cmd.AddValue ("appFlow",
                 "Install the uplink and downlink UDP flow generation application",
                 params.traceFlow);

@@ -28,17 +28,19 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
                                            NodeContainer enbSector1Container,
                                            NodeContainer enbSector2Container,
                                            NodeContainer enbSector3Container,
-                                           NodeContainer ueSector1Container,
-                                           NodeContainer ueSector2Container,
-                                           NodeContainer ueSector3Container,
+                                           NodeContainer ueNodesContainer,
+                                           //NodeContainer ueSector1Container,
+                                           //NodeContainer ueSector2Container,
+                                           //NodeContainer ueSector3Container,
                                            Ptr<PointToPointEpcHelper> &epcHelper,
                                            Ptr<LteHelper> &lteHelper,
                                            NetDeviceContainer &enbSector1NetDev,
                                            NetDeviceContainer &enbSector2NetDev,
-                                           NetDeviceContainer &enbSector3NetDev,
-                                           NetDeviceContainer &ueSector1NetDev,
-                                           NetDeviceContainer &ueSector2NetDev,
-                                           NetDeviceContainer &ueSector3NetDev)
+                                           NetDeviceContainer &enbSector3NetDev)
+                                           //NetDeviceContainer &ueNetDevsContainer)
+                                           //NetDeviceContainer &ueSector1NetDev,
+                                           //NetDeviceContainer &ueSector2NetDev,
+                                           //NetDeviceContainer &ueSector3NetDev)
 {
   NS_UNUSED (params.downtiltAngle);
 
@@ -139,10 +141,10 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
     }
   else if (params.scenario == "UMi")
     {
-      txPower = 30;
+      txPower = 30;// used to be 30
       pathlossModel = "ns3::ThreeGppUmiStreetCanyonPropagationLossModel";
       //WARNING
-      //pathlossModel = "ns3::ThreeGppRmaPropagationLossModel";
+      //pathlossModel = "ns3::FriisPropagationLossModel";
       //Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue(200));
       //pathlossModel = "ns3::RangePropagationLossModel";
     }
@@ -170,7 +172,9 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   //Config::SetDefault ("ns3::LteUePhy::NoiseFigure", DoubleValue (9.0));
   //Config::SetDefault ("ns3::LteUePhy::EnableRlfDetection", BooleanValue (false));
   //Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
-  lteHelper->SetAttribute ("PathlossModel", StringValue (pathlossModel)); // for each band the same pathloss model
+ 
+ //WARNING: set this to something   
+ lteHelper->SetAttribute ("PathlossModel", StringValue (pathlossModel)); // for each band the same pathloss model
   
   //WARNING: should be enabled
   lteHelper->SetPathlossModelAttribute ("ShadowingEnabled", BooleanValue (true));
@@ -239,30 +243,34 @@ LteUtils::SetLteSimulatorParameters (const Parameters &params,
   lteHelper->SetEnbDeviceAttribute ("UlEarfcn", UintegerValue (centralFrequencyBand2Ul));
   enbSector3NetDev = lteHelper->InstallEnbDevice (enbSector3Container);
 
+    /*
   ueSector1NetDev = lteHelper->InstallUeDevice (ueSector1Container);
   NetDeviceContainer ueNetDevs (ueSector1NetDev);
   ueSector2NetDev = lteHelper->InstallUeDevice (ueSector2Container);
   ueNetDevs.Add (ueSector2NetDev);
   ueSector3NetDev = lteHelper->InstallUeDevice (ueSector3Container);
-  ueNetDevs.Add (ueSector3NetDev);
+  ueNetDevs.Add (ueSector3NetDev);*/
     
   int64_t randomStream = 1;
   randomStream += lteHelper->AssignStreams (enbSector1NetDev, randomStream);
   randomStream += lteHelper->AssignStreams (enbSector2NetDev, randomStream);
   randomStream += lteHelper->AssignStreams (enbSector3NetDev, randomStream);
-  randomStream += lteHelper->AssignStreams (ueSector1NetDev, randomStream);
-  randomStream += lteHelper->AssignStreams (ueSector2NetDev, randomStream);
-  randomStream += lteHelper->AssignStreams (ueSector3NetDev, randomStream);
+  
+  //randomStream += lteHelper->AssignStreams (ueSector1NetDev, randomStream);
+  //randomStream += lteHelper->AssignStreams (ueSector2NetDev, randomStream);
+  //randomStream += lteHelper->AssignStreams (ueSector3NetDev, randomStream);
 
-
-
+/*
+  ueNetDevsContainer = lteHelper->InstallUeDevice (ueNodesContainer);  
+  int64_t randomStream = 1;
+  randomStream += lteHelper->AssignStreams (ueNetDevsContainer, randomStream);    
   // This part is for asserts or sanity checks   
-  for (auto nd = ueNetDevs.Begin (); nd != ueNetDevs.End (); ++nd)
+  for (auto nd = ueNetDevsContainer.Begin (); nd != ueNetDevsContainer.End (); ++nd)
     {
       auto ueNetDevice = DynamicCast<LteUeNetDevice> (*nd);
       NS_ASSERT (ueNetDevice->GetCcMap ().size () == 1);
       auto uePhy = ueNetDevice->GetPhy ();
-    }
+    }*/
 }
 
 } // namespace ns3

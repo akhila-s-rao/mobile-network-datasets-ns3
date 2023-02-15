@@ -67,38 +67,46 @@ not_to_be_used_now=['UlInterferenceStats.txt']
 
 import matplotlib.pyplot as plt
 import numpy as np
-#import wandb
-
+  
 def plot_histogram(val, colour, xlabel, plot_name, plot_dir):
-    plt.figure(figsize=(10,3))
-    xlimit=np.nanquantile(val,0.98)
+    plt.figure(figsize=(6,4))
+    xlimit=np.nanquantile(val,0.97)
     plt.hist(val[val <= xlimit], bins=50, color=colour, edgecolor='black')
+    plt.yticks([])
+    plt.xlabel(xlabel); 
+    fname=plot_dir+plot_name
+    plt.savefig(fname)
+    plt.show()
+    
+def plot_histogram_xlim(val, colour, xlabel, plot_name, plot_dir, xlimit):
+    plt.figure(figsize=(6,4))
+    val = val[(val > xlimit[0])]
+    val = val[(val <= xlimit[1])]
+    plt.hist(val, bins=50, color=colour, edgecolor='black')
     plt.yticks([])
     plt.xlabel(xlabel); 
     #plt.xlim(0, xlimit);
     fname=plot_dir+plot_name
     plt.savefig(fname)
-    plt.show()
-    #wandb.log({plot_name: wandb.Image(fname)})
+    plt.show()    
+    
     
 def plot_metric_vs_distance_to_cell(dist, y, colour, ylabel, plot_name, plot_dir):
-    fig = plt.figure(figsize=(10,3))
-    ylimit=np.nanquantile(y,0.98)
+    fig = plt.figure(figsize=(8,6))
+    ylimit=np.nanquantile(y,0.99)
     plt.plot(dist[y <= ylimit], y[y <= ylimit], '.', color=colour)
     plt.ylim()
-    plt.xlabel('Distance between UE and basestation'); plt.ylabel(ylabel); 
+    plt.xlabel('UE - BS distance (meters)'); plt.ylabel(ylabel); 
     fname=plot_dir+plot_name
     plt.savefig(fname)
     plt.show()
-    #wandb.log({plot_name: wandb.Image(fname)})
     
 def plot_metric_vs_sinr(sinr, y, colour, ylabel, plot_name, plot_dir):
-    fig = plt.figure(figsize=(10,5))
-    ylimit=np.nanquantile(y,0.98)
+    fig = plt.figure(figsize=(8,6))
+    ylimit=np.nanquantile(y,0.99)
     plt.plot(sinr[y <= ylimit], y[y <= ylimit], '.', color=colour)
     plt.ylim()
-    plt.xlabel('SINR'); plt.ylabel(ylabel); 
+    plt.xlabel('SINR (dB)'); plt.ylabel(ylabel); 
     fname=plot_dir+plot_name
     plt.savefig(fname)
-    plt.show()
-    #wandb.log({plot_name: wandb.Image(fname)})    
+    plt.show()  
