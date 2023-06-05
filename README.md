@@ -33,5 +33,5 @@ cd mobile-network-datasets-ns3/ns-3-dev/src/nr/examples/dataset_gen_scripts
 edit run_script.sh as required
 bash run_script.sh 
 
-### Curated datasets genrated from these scripts can be found at (google drive link) 
-https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=drive_link
+### Curated datasets genrated from these scripts can be found at (google drive link)
+https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sharing
