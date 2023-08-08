@@ -4,7 +4,7 @@ sleep 1
 
 # debug mode runs using gdb. Make sure to set the particular run number you want 
 # (probably the one that crashed the quickest)
-debug_mode=1
+debug_mode=0
 
 # If this is set to 2 then 2 separate simulation 
 # campaigns will start one after the other 
@@ -32,7 +32,7 @@ mkdir "$data_dir1/$script_save_dir_name"
 # Save all relevant scripts (this script and the ns3 scripts)
 cp -r "$run_script_loc/"* "$data_dir1/$script_save_dir_name/."
 
-len=10
+len=20
 seed_shifter=0
 
 if [ $debug_mode -eq 1 ]
@@ -50,21 +50,22 @@ do
        --useMicroLayer=true \
 	   --numMicroCells=3 \
        --ueNumPerMicroGnb=10 \
-	   --appGenerationTime=100 \
+	   --appGenerationTime=1000 \
 	   --rat=LTE \
 	   --operationMode=FDD \
        --handoverAlgo=A2A4Rsrq \
        --enableUlPc=true \
        --appDlThput=false \
        --appUlThput=false \
-       --appHttp=true \
+       --appHttp=false \
        --appDash=true \
-       --appVr=true \
+       --appVr=false \
        --numMacroVrUes=1 \
        --numMicroVrUes=3 \
        --freqScenario=1 \
-       --randomSeed=19"
-       #--randomSeed=$(($i + $seed_shifter))"
+       --randomSeed=$(($i + $seed_shifter))"
+       #--randomSeed=19"
+       
 
   run_dir="run$(($i + 1))"  
   mkdir "$data_dir1/$run_dir"
@@ -80,8 +81,8 @@ do
     #./waf --run --command-template="valgrind --leak-check=full --show-reachable=yes %s" "$cmd_args --cwd=$data_dir1/$run_dir"
   else # Run
     taskset -c $i ./waf --run-no-build "$cmd_args" --cwd="$data_dir1/$run_dir" \
-      > "$data_dir1/$run_dir/simulation_info.txt" & #\
-      #2> "$data_dir1/$run_dir/stderr_log.txt" &
+      > "$data_dir1/$run_dir/simulation_info.txt" \
+      2> "$data_dir1/$run_dir/stderr_log.txt" &
   fi
 
   echo "Started run $(($i + 1))" 

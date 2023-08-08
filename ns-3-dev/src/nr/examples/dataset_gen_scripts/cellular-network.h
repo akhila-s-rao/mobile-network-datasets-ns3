@@ -106,8 +106,8 @@ struct Parameters
     
     // network parameters
     
-    uint32_t tcpSndRcvBuf = 1000*1024;
-    //uint32_t tcpSndRcvBuf = 1000*1024;  // ns3 default is 131072 which is too small and restricts bandwidth 
+    uint32_t tcpSndRcvBuf = 500*1024; // 1000*1024
+    //uint32_t tcpRcvBuf = 1000*1024;  // ns3 default is 131072 which is too small and restricts bandwidth 
                                         //especially VR which pushed a very large frame to the buffer all at once
     
     // mobility model 
@@ -144,9 +144,9 @@ struct Parameters
     
     // DASH video streaming 
     
-    double targetDt = 16.0; // The target time difference between receiving and playing a frame. [s].
+    double targetDt = 20.0; // The target time difference between receiving and playing a frame. [s].
     double window = 5.0; // The window for measuring the average throughput. [s].
-    uint32_t videoBufferSize = 5*(1024*1024); // The space in bytes that is used for buffering the video
+    uint32_t videoBufferSize = 16*(1024*1024); // The space in bytes that is used for buffering the video
                                                // max bitrate is 4.2Mbps in our case so to buffer 30 s of video 
                                                // at max rate we need 16 MB
     std::string abr = "ns3::FdashClient";

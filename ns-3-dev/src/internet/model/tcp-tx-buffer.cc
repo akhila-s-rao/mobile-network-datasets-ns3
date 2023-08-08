@@ -245,7 +245,7 @@ TcpTxBuffer::CopyFromSequence (uint32_t numBytes, const SequenceNumber32& seq)
 
       NS_LOG_DEBUG ("Returning already sent item " << *outItem << " from " << *this);
     }
-  else if (m_firstByteSeq + m_sentSize <= seq)
+  else if (m_firstByteSeq + m_sentSize <= seq) 
     {
       NS_ABORT_MSG_UNLESS (m_firstByteSeq + m_sentSize == seq,
                            "Requesting a piece of new data with an hole");
@@ -1022,7 +1022,7 @@ TcpTxBuffer::NextSeg (SequenceNumber32 *seq, SequenceNumber32 *seqHigh, bool isR
    */
   if (SizeFromSequence (m_firstByteSeq + m_sentSize) > 0)
     {
-      if (m_sentSize <= m_rWndCallback ())
+      if (m_sentSize < m_rWndCallback ()) // original has (m_sentSize < m_rWndCallback ()) which is suspected to be the case of random triggers of error
         {
           NS_LOG_INFO ("There is unsent data. Send it");
           *seq = m_firstByteSeq + m_sentSize;

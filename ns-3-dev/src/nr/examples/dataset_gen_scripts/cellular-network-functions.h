@@ -1299,6 +1299,7 @@ void CreateTraceFiles (void)
 // Print the scenario parameters into a file for the parsing and visualisation scripts to use 
 void PrintSimInfoToFile()
 {
+    std::cout << "Inside PrintSimInfoToFile function that prints to sim_info.txt file" << std::endl;
     *simInfoStream->GetStream() <<"parameter,value" << "\n"; 
     *simInfoStream->GetStream() << "macro_rings," << global_params.numOuterRings << "\n";
     *simInfoStream->GetStream() << "macro_num_bs," << macroLayerGnbNodes.GetN() << "\n";
@@ -1322,6 +1323,7 @@ void PrintSimInfoToFile()
     *simInfoStream->GetStream() << "http_app_installed," << (global_params.traceHttp ? 1 : 0) << "\n";
     *simInfoStream->GetStream() << "dash_app_installed," << (global_params.traceDash ? 1 : 0) << "\n";
     *simInfoStream->GetStream() << "vr_app_installed," << (global_params.traceVr ? 1 : 0) << "\n";   
+    std::cout << "Exiting PrintSimInfoToFile function that prints to sim_info.txt file" << std::endl;
     
     // Yet to be filled in
     /*
@@ -1460,7 +1462,7 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
     }
     MSG ("Spectrum configuration") << (p.freqScenario == 0 ? "non-" : "") << "overlapping";
     MSG ("Scheduler") << p.scheduler;    
-    MSG ("RLC buffer size") << p.rlcUmTxBuffSize << " Bytes"; 
+    //MSG ("RLC buffer size") << p.rlcUmTxBuffSize << " Bytes"; 
     
     if (p.rat == "NR") // NR
     {
@@ -1474,7 +1476,7 @@ std::ostream & operator << (std::ostream & os, const Parameters & parameters)
     }
     MSG ("");
 
-    MSG ("TCP Send/REcv Buffer Size") << p.tcpSndRcvBuf << " Bytes";
+    //MSG ("TCP Send/REcv Buffer Size") << p.tcpSndRcvBuf << " Bytes";
     MSG ("");
     
     

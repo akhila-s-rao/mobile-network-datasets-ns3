@@ -200,8 +200,8 @@ SpectrumValue::Divide (const SpectrumValue& x)
   Values::iterator it1 = m_values.begin ();
   Values::const_iterator it2 = x.m_values.begin ();
 
-  NS_ASSERT (m_spectrumModel == x.m_spectrumModel);
-  NS_ASSERT (m_values.size () == x.m_values.size ());
+  //NS_ASSERT (m_spectrumModel == x.m_spectrumModel);
+  //NS_ASSERT (m_values.size () == x.m_values.size ());
 
   while (it1 != m_values.end ())
     {

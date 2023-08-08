@@ -58,7 +58,8 @@ NS_LOG_COMPONENT_DEFINE ("CellularNetwork");
 namespace ns3 {
     
 void CellularNetwork (const Parameters &params){
-
+    LogComponentEnable ("DashServer", LOG_LEVEL_INFO);
+    LogComponentEnable ("DashClient", LOG_LEVEL_INFO);
     // Validate the parameter settings  
     params.Validate ();
     // Set as global for easy access
@@ -73,7 +74,7 @@ void CellularNetwork (const Parameters &params){
     // The UeSinrSamplePeriod and InterferenceSamplePeriod from LteEnbPhy are multiplied by this SrsPeriodicity
     // because I guess they are measured on every srsReport. So make to account for this when you set the logging period   
     Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (80));// 320 is max {0, 2, 5, 10, 20, 40,  80, 160, 320}
-    //Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
+    Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
     Config::SetDefault ("ns3::LteSpectrumPhy::CtrlErrorModelEnabled", BooleanValue (false));
     // Set time granularity for RAN traces that are periodic
     Config::SetDefault ("ns3::LteUePhy::RsrpSinrSamplePeriod", UintegerValue (params.ranSamplePeriodMilli));
