@@ -2,11 +2,24 @@
 
 # All the log files from the ns-3 inbuilt RAN logs enabled by EnableTraces() 
 # I have taken the Interference file off this list because it was Goddamn huge and I did not plan on using it anyway
-ran_files = ['DlTxPhyStats.txt', 'UlRxPhyStats.txt', 
-             'UlSinrStats.txt', 'UlPdcpStats.txt', 'DlRsrpSinrStats.txt', 
-             'UlRlcStats.txt', 'UlMacStats.txt', 'UlTxPhyStats.txt', 
-             'DlPdcpStats.txt', 'DlRlcStats.txt', 'DlRxPhyStats.txt', 
-             'DlMacStats.txt']
+ran_files = ['UlSinrStats.txt', # observed at basestation 
+             'DlRsrpSinrStats.txt', # observed at UEs
+             'UlTxPhyStats.txt', # observed at UEs 
+             'UlRxPhyStats.txt', # observed at basestation 
+             'DlTxPhyStats.txt', # observed at basestation 
+             'DlRxPhyStats.txt', # observed at UEs
+             'UlMacStats.txt', # observed at basestation 
+             'DlMacStats.txt', # observed at basestation 
+             'UlRlcStats.txt', # observed at ?
+             'DlRlcStats.txt', # observed at ?
+             'UlPdcpStats.txt', # observed at ?
+             'DlPdcpStats.txt' # observed at ?
+             ]
+#ran_files = ['DlTxPhyStats.txt', 'UlRxPhyStats.txt', 
+#             'UlSinrStats.txt', 'UlPdcpStats.txt', 'DlRsrpSinrStats.txt', 
+#             'UlRlcStats.txt', 'UlMacStats.txt', 'UlTxPhyStats.txt', 
+#             'DlPdcpStats.txt', 'DlRlcStats.txt', 'DlRxPhyStats.txt', 
+#             'DlMacStats.txt']
 
 # All application related log files
 app_files = ['vrBurst_trace.txt', 'vrFragment_trace.txt', # VR
@@ -47,7 +60,7 @@ file_name_to_tstamp_unit = {'DlTxPhyStats.txt':'ms', 'UlRxPhyStats.txt':'ms',
 # These are files that will go through the windowing process where the time slice is made uniform and all IMSIs are included 
 # Don't include files which do not have all IMSIs
 a_vs_b_files = ran_files + ['mobility_trace.txt', 'dlThroughput_trace.txt', 'ulThroughput_trace.txt', 
-                            'delay_trace.txt', 'rtt_trace.txt'] 
+                            'delay_trace.txt', 'rtt_trace.txt', 'vrFragment_trace.txt', 'dashClient_trace.txt'] 
 
 # The internal log files do not follow a consistent naming convention for some metrics
 # and hence I need to isolate them and fix it
@@ -64,6 +77,13 @@ not_to_be_used_now=['UlInterferenceStats.txt']
 # this has all files except interference
 #files = ran_files + app_files + other_files 
 
+# These are to be used to work with or dropped before the columsn fo multiple logs are combined 
+# since these are col names before adding any suffix or prefix to col names to combine them over multiple diff logs  
+ran_sum_feats = ['sizeTb1', 'sizeTb2', 'nTxPDUs', 'TxBytes', 'nRxPDUs', 'RxBytes', 'size']
+#app_sum_feats =  
+
+drop_cols_before_sep = ['ueId', 'RNTI', 'IMSI', 'tstamp_us']
+drop_cols_after_sep = ['cellId','cell_cellId']
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -109,4 +129,4 @@ def plot_metric_vs_sinr(sinr, y, colour, ylabel, plot_name, plot_dir):
     plt.xlabel('SINR (dB)'); plt.ylabel(ylabel); 
     fname=plot_dir+plot_name
     plt.savefig(fname)
-    plt.show()  
+    plt.show()   

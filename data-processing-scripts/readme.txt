@@ -38,88 +38,6 @@
 
 
 
-#=======================================
-# Organising UEs into groups 
-#=======================================
-
-# Slow moving UEs group 
-# Fast moving UEs group 
-# Web browsing UEs group 
-# Video streaming UEs group 
-# VR UEs group 
-# No traffic apps UEs group 
-# Thput measurement UE 
-
-# based on the UE entries in the corresponding log files I can get the UE IMSIs of app groups  
-# it is only slow moving and fast moving UE categories that I cannot separate out from files 
-# (easily at least, I could measure the average speed and categorize them)
-
-
-# Separate out the IDs of the UEs that have a specific set of apps running on them  
-#ueIds = np.arange(0,total_num_ues)
-# UEs with only delay measurements and no background traffic:
-#isIncluded=np.array( [((x % 5) == 0) for x in range(0,total_num_ues)], dtype=bool)
-#trafficClass1_ueIds=ueIds[isIncluded]
-# UEs with video streams:
-#isIncluded=np.array( [ ( ((x % 5) != 0) and (x%2 ==0) ) for x in range(0,total_num_ues)], dtype=bool)
-#trafficClass2_ueIds=ueIds[isIncluded]
-# UEs with web browsing:
-#isIncluded=np.array( [ ( ((x % 5) != 0) and (x%2 !=0) ) for x in range(0,total_num_ues)], dtype=bool)
-#trafficClass3_ueIds=ueIds[isIncluded]
-
-#!!!!!! But I do not know what the IMSI of these ueIds are 
-#Maybe I should create these groups in ns3 code using IMSI instead of ueId 
-
-
-
-
-Plan
-====
-Tuesday
-- Decide on parameters for the 2 scenarios and create a 200s run for each 
-- Take those graphs and put it in the paper for sizing
-- Make the plots pretty (take away space between them, adjust the axis etc.)
-- Organize and pretty up the scenario description tables
-
-Wednesday 
-- Reduce size of motivation and related work 
-- Complete the data format section
-- Write the design decisions section
-- Add the ML tasks in related wrok table
-- Read the beyond throughput paper and see what inspirations I can borrow. 
-
-Thursday 
-- Pimp up the github page and add links to the google directory with data 
-- Write about how this is useful to the multimedia community
-
-Friday 
-- Improve language 
-
-
-
-
-
-
-
-
-parameters yet to be fixed 
-==========================
-
-- DONE ueTxPower (lte-utils.cc) enableUlPc but the default value set to 10 dBm 
--  ? macro txPower (lte-utils.cc) 30 dBm (we set it to lower than the dual-stripe scenario even though I think we have a more punishing model, is this okay ? I need to check with a REM map)
-- ? microTx power (cellular-network.h) right now it is 18dBm 
-- ? cosine antenna MaxGain (lte-utils.cc) as of now it is 3  
-- DONE handover algorithm (cellular-network.cc) A2A4Rsrq
-- DONE beamwidth for cosine antenna (lte-utils.cc) 60 degrees 
-- ? ISD 500 m depends on the Tx power set for macro Tx
-- Macro bounding box 
-- Micro bounding box
-- 
-
-
-
-
-
 Scenario 1
 ==========
 Macro topology 
@@ -159,3 +77,36 @@ Things I need to find out
 
 
 
+
+
+
+==================================================================================
+ul tx power: max 10dBm with power control 
+
+I should not remove x2 connection from micro UEs
+I should not force initial connections 
+
+
+-----------------------
+macro tx power: 15 dBm 
+macro #UEs: 15
+
+ul rx rate: 0.97 
+dl rax rate: 0.93 
+------------------------
+macro tx power: 23 dBm 
+macro #UEs: 15
+
+ul rx rate: 0.97 
+dl rax rate: 0.99
+------------------------
+The UL rx rate in interference llimited and hence will only reduce beyong this if #UEs are reduced
+So In the final scenario with #UEs beign increased the ul rs rate will actually increase
+
+The Dl rx rate at 23 dBm is pretty high already, we can increase the macro tx power to 25 dBm to make it 1.00 
+This however I expect will not do anything to the UL rx rate
+
+macro tx power: 
+macro #UEs:
+micro tx power:
+micro #UEs:
