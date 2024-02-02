@@ -87,7 +87,19 @@ drop_cols_after_sep = ['cellId','cell_cellId']
 
 import matplotlib.pyplot as plt
 import numpy as np
-  
+
+def filtered_imsis(filter_str, imsis):
+    if filter_str == 'macro':
+        return list(set(imsis).intersection(macro_imsis))
+    elif filter_str == 'micro':
+        return list(set(imsis).intersection(micro_imsis))
+    elif filter_str == 'fast':
+        return list(set(imsis).intersection(fast_imsis))
+    elif filter_str == 'slow':
+        return list(set(imsis).intersection(slow_imsis))
+    else:# keep them all 
+        return imsis
+
 def plot_histogram(val, colour, xlabel, plot_name, plot_dir):
     plt.figure(figsize=(6,4))
     xlimit=np.nanquantile(val,0.97)
