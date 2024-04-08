@@ -28,12 +28,12 @@ Several components will not be configured and be shown in red. This is normal.
 ## Step 5: Create a folder to store your logs
 mkdir logs
  
-## Step 6: Tune parameter knobs, modify the simulation scenario setup and run a simulation campaign through   
+## Step 6: Tune parameter knobs, modify the simulation scenario setup and run a simulation campaign   
 cd mobile-network-datasets-ns3/ns-3-dev/src/nr/examples/dataset_gen_scripts 
 edit run_script.sh as required
 bash run_script.sh 
 
-### Curated datasets genrated from these scripts can be found at (google drive link)
+### Curated datasets generated from these scripts can be found at (google drive link)
 https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sharing
 
 
