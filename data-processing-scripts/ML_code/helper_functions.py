@@ -13,8 +13,16 @@ from tensorflow.keras.backend import clear_session
 from tensorflow.keras.metrics import MeanAbsolutePercentageError
 
 
+from pytorch_tabnet.tab_model import TabNetClassifier, TabNetRegressor
+
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import MaxAbsScaler
+from sklearn.preprocessing import Normalizer(norm='l2')
+
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import median_absolute_error
 from sklearn.metrics import mean_squared_error
@@ -54,8 +62,6 @@ from xgboost import XGBClassifier
 
 plt.rcParams.update({'font.size': 22})
 
-model_save_path = 'models/'
-
 # regression
 IN_PARAM_R = {
     'classification': False,
@@ -67,7 +73,7 @@ IN_PARAM_R = {
     'out_activation': 'linear', 
     'num_layers': 3,
     'epochs': 500,
-    'batch_size': 512,#64
+    'batch_size': 64,
     'learning_rate': 0.0001,
     'rand_seed': 13,
     'train_size': 0,
@@ -112,6 +118,32 @@ OUT_PARAM_C = {
     'test_f1score': 0
 }
 
+#=============================================
+# Data Manipulation Functions
+#=============================================
+
+# Takes a pandas df as input and selects samples that belong to a slice
+def data_slice_filter_samples(slice, df, network_info):
+    if slice == 'macro':
+        # separate all the samples where cellId is in the macro_cells list
+        filtered_df = df[df['cellId'].isin(network_info['macro_cells'])]
+    elif slice == 'micro':
+        # separate all the samples where cellId is in the micro_cells list
+        filtered_df = df[df['cellId'].isin(network_info['micro_cells'])]
+    elif slice == 'fast':
+        # get all the fast IMSIs
+        filtered_df = df[df['IMSI'].isin(network_info['fast_imsis'])]
+    elif slice == 'slow':
+        filtered_df = df[df['IMSI'].isin(network_info['slow_imsis'])]
+    elif slice == 'all':
+        # keep all return the whole slice
+        filtered_df = df
+    else:
+        print('UNKNOWN SLICE NAME')
+        filtered_df = df
+    #print(filtered_df[['IMSI', 'cellId']].head(n=10) )
+    return filtered_df
+
 # taking num of steps as input create step indexed column names for a set of columns
 # This is currently used to expand the drop_cols set depending of whether one needs 
 # to drop just one or multiple steps of this column 
@@ -126,6 +158,12 @@ def expand_cols_to_step_size(cols, steps):
     #print(expanded_cols)    
     return expanded_cols
 
+
+
+#=============================================
+# Loss Functions and Error Functions
+#=============================================
+
 def softmax(x):
     return(np.exp(x)/np.exp(x).sum())
 
@@ -138,16 +176,11 @@ def dist_penalty_obj(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[np.ndarray
         [4,7,50,7,1],
         [4,4,7,50,1],
         [1,1,1,1,50]])
-
-    #penalty_matrix = np.ones_like(penalty_matrix)
-    
+    #penalty_matrix = np.ones_like(penalty_matrix)    
     weights = np.ones((num_rows, 1), dtype=float)
-
     grad = np.zeros((num_rows, num_classes), dtype=float)
     hess = np.zeros((num_rows, num_classes), dtype=float)
-
     eps = 1e-6
-
     # compute the gradient and hessian, slow iterations in Python, only
     # suitable for demo.  Also the one in native XGBoost core is more robust to
     # numeric overflow as we don't do anything to mitigate the `exp` in
@@ -162,13 +195,29 @@ def dist_penalty_obj(y_true: np.ndarray, y_pred: np.ndarray) -> Tuple[np.ndarray
             h = max((2.0 * p[c] * (1.0 - p[c]) * weights[r]).item(), eps)
             grad[r, c] = g
             hess[r, c] = h
-
+            
     # Right now (XGBoost 1.0.0), reshaping is necessary
     grad = grad.reshape((num_rows * num_classes, 1))
     hess = hess.reshape((num_rows * num_classes, 1))
     return grad, hess
 
+# Take as input, class labels and then convert them to delay values by mapping them to 
+# the mid-points of the bins. This way I can compute mae from class labels   
+def class_mae(yhat, y, num_classes, delay_class_edges):
+    # find the mid points of bins from the bin edges
+    class_vals = (delay_class_edges + np.roll(delay_class_edges, 1))/2
+    class_vals = class_vals[1:num_classes+1]
+    # replace bin class labels with corresponding bin midpoints  
+    yhat_val = [class_vals[int(i)] for i in yhat]
+    y_val = [class_vals[int(i)] for i in y]
+    # compute mae with these mid points
+    return mean_absolute_error(yhat_val, y_val)
 
+# Take as input class labels in continuous form and convert them to class labels 
+# Then compute the confusion matrix 
+def value_to_class_label(vals, delay_class_edges):
+    delay_class_indices = np.digitize(vals, delay_class_edges)
+    return (delay_class_indices - 1)
 
 # Custom MAPE loss function
 #def mape_objective_function(preds, dtrain):
@@ -194,56 +243,110 @@ def compute_error(truth, pred, err_type):
     else:# assuming it is mse
         return mean_squared_error(truth, pred)
 
-def get_xgb_model(IN_PARAM):
-    if IN_PARAM['classification']:
-        if IN_PARAM['imbalance_handling_method'] == 'classWeights':
-            weight_ratio = IN_PARAM['class_weights'][1] / IN_PARAM['class_weights'][0]
-            model = XGBClassifier(n_jobs=30, scale_pos_weight=weight_ratio)
-        else:
-            if IN_PARAM['loss'] == 'dist_penalty':
-                print('using classification loss objective: dist_penalty')
-                model = XGBClassifier(n_jobs=30, use_label_encoder=False, objective=dist_penalty_obj)
-            elif IN_PARAM['loss'] == 'class_mse':
-                # using regression to preserve class order importance 
-                # Take round after to attain class 
-                model = XGBRegressor(n_jobs=30, seed=IN_PARAM['rand_seed'])
-            else: # default
-                print('default classification loss objective')
-                model = XGBClassifier(n_jobs=30, use_label_encoder=False)
-    else:
-        print('rand seed used: ', IN_PARAM['rand_seed'])
-        if IN_PARAM['loss'] == 'mae':
-            #'reg:absoluteerror'
-            #params = {'objective':'reg:pseudohubererror'}
-            model = XGBRegressor(**params, n_jobs=30, seed=IN_PARAM['rand_seed'])
-        elif IN_PARAM['loss'] == 'mape':
-            model = XGBRegressor(n_jobs=30, seed=IN_PARAM['rand_seed'], 
-                            objective=mape_obj)
-                            #eval_metric=mean_absolute_percentage_error,
-        else:# use the default which is mse
-            model = XGBRegressor(n_jobs=30, seed=IN_PARAM['rand_seed'])
-            
-    return model
 
-def get_rf_model(IN_PARAM):
-    if IN_PARAM['classification']:
-        if IN_PARAM['imbalance_handling_method'] == 'classWeights':
-            print(IN_PARAM['class_weights'])
-            model = RandomForestClassifier(n_jobs=10, class_weight=IN_PARAM['class_weights'])
-        else:
-            model = RandomForestClassifier(n_jobs=10)
+#========================================
+# Pretraining functions
+#========================================
+
+# Takes a pandas df as input and sets up dae pretraining. Returns the model  
+def pretrain_with_dae(df, hypp_ssl_dae):
+    # initialize a dae model   
+    if hypp_ssl_dae['arch'] == 'deepstack':
+        dae = DAE(
+            body_network=hypp_ssl_dae['arch'],
+            body_network_cfg=dict(hidden_size=hypp_ssl_dae['hid_size'], num_layers=hypp_ssl_dae['num_layers']),
+            swap_noise_probas=hypp_ssl_dae['swap_noise_prob'],
+            device='cuda')
+    elif hypp_ssl_dae['arch'] == 'deepbottleneck':
+        dae = DAE(
+            body_network=hypp_ssl_dae['arch'],
+            body_network_cfg=dict(hidden_size=hypp_ssl_dae['hid_size'], num_layers=hypp_ssl_dae['num_layers'], bottleneck_size=hypp_ssl_dae['bottle_neck_size']),
+            swap_noise_probas=hypp_ssl_dae['swap_noise_prob'],
+            device='cuda')
+    # fit the model
+    dae.fit(df, verbose=1, optimizer_params={'lr': 3e-4}, batch_size=hypp_ssl_dae['batch_size'])
+    return dae
+
+# Takes a pandas df as input and sets up tabnet pretraining. Returns the model  
+def pretrain_with_tabnet(X_ssl_train, X_ssl_val, hypp_ssl_tabnet):
+    # initialize a tabnet model   
+    # TabNetPretrainer
+    ssl_model = TabNetPretrainer(
+        optimizer_fn=Adam,
+        optimizer_params=dict(lr=2e-2),
+        mask_type=hypp_ssl_tabnet['mask_type'],
+        n_a = hypp_ssl_tabnet['n_da'], 
+        n_d = hypp_ssl_tabnet['n_da'], 
+        n_steps = hypp_ssl_tabnet['n_steps'],
+        n_independent=hypp_ssl_tabnet['n_independent'],
+        n_shared=hypp_ssl_tabnet['n_shared'],
+        n_shared_decoder=hypp_ssl_tabnet['n_shared_decoder'],
+        n_indep_decoder=hypp_ssl_tabnet['n_indep_decoder']
+    )
+    ssl_model.fit(
+        X_train=X_ssl_train.values,
+        eval_set=[X_ssl_val.values],
+        pretraining_ratio=hypp_ssl_tabnet['noise_ratio'],
+        batch_size=hypp_ssl_tabnet['batch_size'],
+        max_epochs=hypp_ssl_tabnet['max_epochs'],
+        patience=hypp_ssl_tabnet['patience']
+    )
+    return ssl_model
+
+
+#==================================================
+# Scalers, Models and Training functions 
+#==================================================
+
+# We need to try different Scalers
+def create_scaler (train, scaler_type):
+    if scaler_type == 'minmax':
+        val_scaler = MinMaxScaler()
+    elif scaler_type == 'standard':
+        val_scaler = StandardScaler()
+    elif scaler_type == 'robust':
+        val_scaler = RobustScaler()
+    elif scaler_type == 'maxabs':
+        val_scaler = MaxAbsScaler()
+    elif scaler_type == 'l2norm':
+        val_scaler = Normalizer(norm='l2')
     else:
-        model = RandomForestRegressor(n_jobs=10)
+        print('Unknown scaler type')
         
-    return model
+    val_scaler.fit(train)
+    return val_scaler
 
-def get_mlp_model(n_inputs, n_outputs, IN_PARAM):
+def get_xgb_model(IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params):
+    print('rand seed used: ', IN_PARAM['rand_seed'])
+    if IN_PARAM['loss'] == 'mae':
+        #'reg:absoluteerror'
+        #params = {'objective':'reg:pseudohubererror'}
+        model = XGBRegressor(**params, n_jobs=30, seed=IN_PARAM['rand_seed'])
+    elif IN_PARAM['loss'] == 'mape':
+        model = XGBRegressor(n_jobs=30, seed=IN_PARAM['rand_seed'], 
+                        objective=mape_obj)
+                        #eval_metric=mean_absolute_percentage_error,
+    else:# use the default which is mse
+        model = XGBRegressor(n_jobs=30, seed=IN_PARAM['rand_seed'])
+
+    # fit the model
+    history = model.fit(X_train, y_train)
+
+    # save the model
+    model.save_model(model_to_save_name+'.json')
+    
+    return model, history
+
+def get_mlp_model(n_inputs, n_outputs, IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params):
     model = Sequential ()
-    model.add(Dense(40, input_dim=n_inputs, kernel_initializer='he_uniform', activation='relu'))
-    model.add(Dense(20, kernel_initializer='he_uniform', activation='relu'))
-    model.add(Dense(10, kernel_initializer='he_uniform', activation='relu'))
-    model.add(Dense(5, kernel_initializer='he_uniform', activation='relu'))
+    for l in range(0,len(hyper_params['fc_layers'])):
+        if l==0:
+            model.add(Dense(hyper_params['fc_layers'][l], input_dim=n_inputs, kernel_initializer='he_uniform', activation='relu'))
+        else:
+            model.add(Dense(hyper_params['fc_layers'][l], kernel_initializer='he_uniform', activation='relu'))
+    
     model.add(Dense(n_outputs, activation = IN_PARAM['out_activation']))
+    
     optimizer = Adam(learning_rate=IN_PARAM['learning_rate'])
     if IN_PARAM['metrics'][0] == 'mape':
         model.compile(loss=IN_PARAM['loss'], 
@@ -251,59 +354,55 @@ def get_mlp_model(n_inputs, n_outputs, IN_PARAM):
                       metrics=[MeanAbsolutePercentageError()])
     else:
         model.compile(loss=IN_PARAM['loss'], optimizer=optimizer, metrics=IN_PARAM['metrics'])
+
+    # Fit the model 
+    early_stopping = EarlyStopping(monitor='val_loss', patience=hyper_params['patience'], restore_best_weights=True)
+    history = model.fit(X_train,y_train, 
+                        epochs=hyper_params['epochs'], 
+                        batch_size=hyper_params['batch_size'], 
+                        validation_data=(X_test,y_test), 
+                        callbacks=[early_stopping], 
+                        shuffle=True, 
+                        verbose=1)
+
+    model.save(model_to_save_name)
     
-    return model
+    return model, history
 
-def get_lstm_model(n_in_feat, n_in_time, n_output, IN_PARAM):
-    model = Sequential()
-    model.add(LSTM(30, return_sequences=True, input_shape=(n_in_feat, n_in_time)))
-    #model.add(LSTM(15, return_sequences=True))
-    model.add(LSTM(5))
-    model.add(Dense(n_output, activation=IN_PARAM['out_activation']))
-    model.compile(loss=IN_PARAM['loss'], optimizer='adam', metrics=IN_PARAM['metrics'])
+def get_tabnet_model(IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params):
+    model = TabNetRegressor()
+    history = model.fit(
+        X_train, y_train,
+        eval_set=[(X_val, y_val)],
+        batch_size=hyper_params['batch_size'],
+        max_epochs=hyper_params['max_epochs'],
+        patience=hyper_params['patience']
+    )
+
+    # save the model 
+    model.save_model(model_to_save_name)
     
-    return model
+    return model, history
 
-def create_normalizer (train):
-    val_scaler = MinMaxScaler()
-    val_scaler.fit(train)
-    return val_scaler
-
-def evaluate_model (X_train, X_test, y_train, y_test, model_save_path, IN_PARAM, sample_weights=None, save_str=[]):
-    if IN_PARAM['model_type'] == 'lstm':
-        X_train = X_train.reshape(X_train.shape[0], 1, X_train.shape[1])
-        X_test = X_test.reshape(X_test.shape[0], 1, X_test.shape[1])
-        model = get_lstm_model(X_train.shape[1], X_train.shape[2], y_train.shape[1], IN_PARAM)
-    elif IN_PARAM['model_type'] == 'mlp': 
-        y_train = np.expand_dims(y_train, axis=1)
-        y_test = np.expand_dims(y_test, axis=1)
-        model = get_mlp_model(X_train.shape[1], y_train.shape[1], IN_PARAM)
-    elif IN_PARAM['model_type'] == 'rf':
-        model = get_rf_model(IN_PARAM)
+def train_model (X_train, X_val, y_train, y_val, IN_PARAM, model_to_save_name, hyper_params, sample_weights=None, save_str=[]):
+    y_train = np.expand_dims(y_train, axis=1)
+    y_val = np.expand_dims(y_val, axis=1)
+    print('model type', IN_PARAM['model_type'])
+    if IN_PARAM['model_type'] == 'mlp': 
+        model, history = get_mlp_model(X_train.shape[1], y_train.shape[1], IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params)
     elif IN_PARAM['model_type'] == 'xgb':
-        y_train = np.expand_dims(y_train, axis=1)
-        y_test = np.expand_dims(y_test, axis=1)
-        model = get_xgb_model(IN_PARAM)
+        model, history = get_xgb_model(IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params)
+    elif IN_PARAM['model_type'] == 'tabnet':
+        model, history = get_tabnet_model(IN_PARAM, X_train, y_train, X_val, y_val, model_to_save_name, hyper_params)
     else:    
         print('Do not know model')
 
-    
-    if (IN_PARAM['model_type'] == 'rf') or (IN_PARAM['model_type'] == 'xgb'):
-        print(sample_weights)
-        history = model.fit(X_train, y_train, sample_weight=sample_weights)
-    else:
-        # Define early stopping callback
-        early_stopping = EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
-        history = model.fit(X_train,y_train, 
-                            epochs=IN_PARAM['epochs'], 
-                            batch_size=IN_PARAM['batch_size'], 
-                            validation_data=(X_test,y_test), 
-                            callbacks=[early_stopping], 
-                            shuffle=True, 
-                            verbose=1)
-                            #class_weight=IN_PARAM['class_weights'])
-        #model.save(model_save_path + 'fin_' + IN_PARAM['model_type'] +'_'+ save_str +'.h5')    
     return model, history    
+
+
+#==========================================
+# Plotting functions
+#==========================================
 
 def plot_model_train_info (history, model_save_path, IN_PARAM):
     plt.figure(1)
@@ -379,25 +478,54 @@ def plot_heatmap(windowed_combined_data, plot_name):
     #plt.savefig(plot_name)
     fig.show()
 
+def tabnet_explain(model, X, feat_filter, X_feats):
+    # Global explainability : feat importance summing to 1
+    print('Global explainability')
+    importances = model.feature_importances_
+    plot_feature_importance(importances, X_feats, feat_filter)
+    
+    # Local explainability and masks
+    print('Local explainability')
+    explain_matrix, masks = model.explain(X)
+    print('Explainability Matrix')
+    print(explain_matrix)
+    fig, axs = plt.subplots(1, 3, figsize=(20,20))
+    for i in range(3):
+        axs[i].imshow(masks[i][:50])
+        axs[i].set_title(f"mask {i}")
+    return
 
-# Take as input, class labels and then convert them to delay values by mapping them to 
-# the mid-points of the bins. This way I can compute mae from class labels   
-def class_mae(yhat, y, num_classes, delay_class_edges):
-    # find the mid points of bins from the bin edges
-    class_vals = (delay_class_edges + np.roll(delay_class_edges, 1))/2
-    class_vals = class_vals[1:num_classes+1]
-    # replace bin class labels with corresponding bin midpoints  
-    yhat_val = [class_vals[int(i)] for i in yhat]
-    y_val = [class_vals[int(i)] for i in y]
-    # compute mae with these mid points
-    return mean_absolute_error(yhat_val, y_val)
+def xgb_explain(model, feat_filter, X_feats):
+    # The length of importances reflects the number of features used
+    importances = model.feature_importances_
+    plot_feature_importance(importances, X_feats, feat_filter)
+    return
 
-# Take as input class labels in continuous form and convert them to class labels 
-# Then compute the confusion matrix 
-def value_to_class_label(vals, delay_class_edges):
-    delay_class_indices = np.digitize(vals, delay_class_edges)
-    return (delay_class_indices - 1)
+def plot_feature_importance(importances, X_feats, feat_filter):
+    # increasing order in value and hence decreasing order in importance 
+    # sort the importances and then fetch the index value of those importances 
+    indices = np.argsort(importances)
+    #This is in ascending order of 
+    bar_vals = importances[np.flip(indices)[0:feat_filter]]
+    bar_names = X_feats[np.flip(indices)[0:feat_filter]]
+    #print(importances[np.flip(indices)[0:feat_filter]])
+    print(X_feats[np.flip(indices)[0:feat_filter]])
 
+    #top_n_features = list( set(top_n_features).union(set(bar_names)))
+    #print('Top n feature list: ', top_n_features)
+    plt.figure()
+    plt.barh(range(len(bar_vals)), np.flip(bar_vals), color='b', align='center')
+    plt.yticks(range(len(bar_vals)), np.flip(bar_names))
+
+    plt.title('Feature importance')
+    plt.xlabel('Relative Importance')
+    #plt.savefig('plots_for_paper/feat_imp'+str(IN_PARAM['rand_seed'])+'.pdf', bbox_inches='tight')
+    plt.show() 
+    
+    return
+#=============================================
+# DANN 
+#=============================================
 
 # Define the domain classifier with a gradient reversal layer
 def gradient_reversal(x):
