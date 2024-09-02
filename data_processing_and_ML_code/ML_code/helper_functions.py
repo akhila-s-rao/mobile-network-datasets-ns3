@@ -1,5 +1,6 @@
+
 # NOTE: I am using keras as well as tensorflow.keras which sounds like it would cause problems 
-# But I am too afraid to touch this because I struggled with some version problems here before and I want ot put this off to later 
+# But I am too afraid to touch this because I struggled with some version problems here before and I want to put this off to later 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import LSTM
@@ -17,7 +18,7 @@ from tensorflow.keras.callbacks import LambdaCallback
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
-from keras.layers import Input, Dense, Lambda, BatchNormalization, Dropout
+from keras.layers import Input, Dense, Lambda, BatchNormalization, Dropout, ReLU
 
 #from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
@@ -64,6 +65,7 @@ from xgboost import XGBClassifier
 
 import torch
 from torch.optim import Adam as Adam_tor
+from torch import nn
 
 from tabular_dae.model import DAE
 from tabular_dae.model import load as dae_load
@@ -77,13 +79,15 @@ from VIME.vime_semi_mod import vime_semi as vime_semi_mod
 from VIME.vime_utils import perf_metric
 
 
-
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
 from pytorch_lightning import Trainer
 from torch.nn import functional as F
-from torch.utils.data import DataLoader, SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
 from pytorch_lightning.utilities.model_summary import ModelSummary
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
+
 
 # TS3L library
 from ts3l.utils import TS3LDataModule
@@ -152,7 +156,98 @@ bitrate_levels = [45000, 89000, 131000, 178000, 221000, 263000, 334000, 396000, 
                   1547000, 2134000, 2484000, 
                   3079000, 3527000, 3840000]
 
+class MLPRegressor(pl.LightningModule):
+    def __init__(self, input_dim, hidden_dims, output_dim, use_batchnorm=True, 
+                 use_dropout=True, dropout_rate=0.1, learning_rate=0.0001):
+        super(MLPRegressor, self).__init__()
+        self.save_hyperparameters()  # Saves all the arguments passed to __init__
+        
+        self.learning_rate = learning_rate
+        # Model layers
+        layers = []
+        # Input to hidden layer
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(input_dim, hidden_dim))
+            # Optionally add BatchNorm layer
+            if use_batchnorm:
+                layers.append(nn.BatchNorm1d(hidden_dim))
+            # ReLU activation
+            layers.append(nn.ReLU())
+            # Optionally add Dropout layer
+            if use_dropout:
+                layers.append(nn.Dropout(dropout_rate))
+            input_dim = hidden_dim
+        
+        # Output layer
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        # Define the model as a sequential container
+        self.model = nn.Sequential(*layers)
+        # Initialize lists to store losses
+        self.train_losses = []
+        self.val_losses = []
+        self.val_mapes = []
+
+        # Initialize variables to accumulate losses within an epoch
+        self.train_loss_epoch = []
+        self.val_loss_epoch = []
+        self.val_mape_epoch = []
+
+    
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.mse_loss(y_hat, y)
+        self.train_loss_epoch.append(loss.item())
+        self.log('train_losses', loss, on_step=False, on_epoch=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = F.mse_loss(y_hat, y)
+        val_mape = torch.mean(torch.abs((y_hat - y) / y)) * 100
+        self.val_loss_epoch.append(val_loss.item())
+        self.val_mape_epoch.append(val_mape.item())
+        self.log('val_losses', val_loss, on_step=False, on_epoch=True)
+        self.log('val_mapes', val_mape, on_step=False, on_epoch=True)
+        return val_loss
+        
+    #def training_epoch_end(self, outputs):
+    #    avg_train_loss = torch.stack([x['loss'] for x in outputs]).mean().item()
+    #    self.train_losses.append(avg_train_loss)
+
+    #def validation_epoch_end(self, outputs):
+    #    avg_val_loss = torch.stack([x for x in outputs]).mean().item()
+    #    self.val_losses.append(avg_val_loss)
+
+    def on_train_epoch_end(self):
+        # Calculate and store the average training loss for the epoch
+        avg_train_loss = np.mean(self.train_loss_epoch)
+        self.train_losses.append(avg_train_loss)
+        self.train_loss_epoch = []  # Reset for the next epoch
+
+    def on_validation_epoch_end(self):
+        # Calculate and store the average validation loss for the epoch
+        avg_val_loss = np.mean(self.val_loss_epoch)
+        self.val_losses.append(avg_val_loss)
+        self.val_loss_epoch = []  # Reset for the next epoch
+        
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return optimizer
+
 class MyProgressBar(TQDMProgressBar):
+    def __init__(self, refresh_rate=10, leave = True):
+        super().__init__()
+        
+        self._refresh_rate = refresh_rate
+        self._leave = leave
+        print('refresh rate: ', refresh_rate)
+        
     def init_validation_tqdm(self):
         bar = super().init_validation_tqdm()
         if not sys.stdout.isatty():
@@ -170,6 +265,29 @@ class MyProgressBar(TQDMProgressBar):
         if not sys.stdout.isatty():
             bar.disable = True
         return bar
+        
+    #def init_train_tqdm(self):
+    #    bar = super().init_train_tqdm()
+    #    if not sys.stdout.isatty():
+    #        bar.disable = True
+    #    return bar
+
+    #def init_sanity_tqdm(self):
+    #    bar = super().init_sanity_tqdm()
+    #    if not sys.stdout.isatty():
+    #        bar.disable = True
+    #    return bar
+    
+    #def on_validation_end(self, trainer, pl_module):
+        
+    #def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        
+    #def on_train_epoch_end(self, trainer, pl_module):
+    #    if (trainer.current_epoch + 1) % self._refresh_rate == 0:
+    #        print(f"Epoch: {trainer.current_epoch + 1}, Loss: {trainer.callback_metrics.get('loss')}")
+    
+
+
 
 def initialize(r=None):
     if r is None:
@@ -428,9 +546,9 @@ def make_data_sup_model_ready(data, learning_task, learning_task_type, all_learn
     # Save the columns to use for feature importance graphs
     X_feats = X.columns.to_numpy()
     continuous_cols, categorical_cols = get_cont_and_cat_cols(X)
-    np.savetxt('input_features_list.csv', X_feats, delimiter=',', fmt="%s")
-    np.savetxt('continuous_input_features.csv', continuous_cols, delimiter=',', fmt="%s")
-    np.savetxt('categorical_input_features.csv', categorical_cols, delimiter=',', fmt="%s")
+    #np.savetxt('input_features_list.csv', X_feats, delimiter=',', fmt="%s")
+    #np.savetxt('continuous_input_features.csv', continuous_cols, delimiter=',', fmt="%s")
+    #np.savetxt('categorical_input_features.csv', categorical_cols, delimiter=',', fmt="%s")
     
     # Convert everything to numpy 
     X = X.to_numpy()
@@ -818,6 +936,72 @@ def get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_para
     
     return model, history
 
+def get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type):
+    print(X_train.shape)
+    print(y_train.shape)
+    
+    train_loader = DataLoader(TensorDataset(torch.tensor(X_train, dtype=torch.float32), 
+                                            torch.tensor(y_train, dtype=torch.float32)), 
+                              batch_size=hyper_params['batch_size'], shuffle=True)
+    val_loader = DataLoader(TensorDataset(torch.tensor(X_val, dtype=torch.float32), 
+                                            torch.tensor(y_val, dtype=torch.float32)), 
+                              batch_size=hyper_params['batch_size'], shuffle=True)
+    
+    if learning_task_type == 'reg':
+        # Model instantiation
+        model = MLPRegressor(input_dim=X_train.shape[1], 
+                             hidden_dims=hyper_params['fc_layers'], output_dim=1, 
+                             use_batchnorm=hyper_params['use_batchnorm'], use_dropout=hyper_params['use_dropout'], 
+                             dropout_rate=hyper_params['dropout_rate'], 
+                             learning_rate=hyper_params['learning_rate'])
+
+    elif learning_task_type == 'clas':
+        y_train = to_categorical(y_train)
+        y_val = to_categorical(y_val)
+        # Model instantiation
+        model = MLPClassifier(input_dim=X_train.shape[1],
+                             hidden_dims=hyper_params['fc_layers'], output_dim=y_train.shape[1],
+                             use_batchnorm=True, use_dropout=True, 
+                             dropout=hyper_params['dropout_rate'], learning_rate=hyper_params['learning_rate'])
+
+    # Early stopping callback
+    early_stopping = EarlyStopping(monitor='val_losses', patience=hyper_params['patience'], 
+                                   mode='min', verbose=True)
+    
+    # Model checkpoint callback to save the best model
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_losses',        # Monitors validation loss
+        dirpath='checkpoints/',    # Directory to save checkpoints
+        filename='best-checkpoint', # Checkpoint filename
+        save_top_k=1,              # Only save the best model
+        mode='min'                 # Minimize the validation loss
+    )
+    
+    trainer = pl.Trainer(accelerator = 'gpu',
+                         max_epochs=hyper_params['max_epochs'],
+                         num_sanity_val_steps = 0,
+                         callbacks=[MyProgressBar(refresh_rate=10)] # early_stopping, checkpoint_callback, 
+                         #default_root_dir=suptrain_models_folder+suptrain_model_to_save_name
+                        )
+    trainer.fit(model, train_loader, val_loader)
+    print(ModelSummary(model, max_depth=-1))
+    
+    # Load the best checkpoint after training
+    #best_model_path = checkpoint_callback.best_model_path
+    #best_model = MLPRegressor.load_from_checkpoint(best_model_path)
+    #best_model.save(model_to_save_name)
+    # Now `best_model` has the weights from the best validation epoch
+
+    print(len(model.train_losses))
+    print(len(model.val_losses))
+    print(len(model.val_mapes))
+    history = {'train_losses': model.train_losses,
+               'val_losses': model.val_losses,
+               'val_mapes': model.val_mapes}
+
+    return model, history
+
+    
 def get_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type):
     
     if learning_task_type == 'clas':
@@ -828,7 +1012,8 @@ def get_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_para
     for l in range(0,len(hyper_params['fc_layers'])):
         # Hidden layers
         if l==0:
-            model.add(Dense(hyper_params['fc_layers'][l], input_dim=X_train.shape[1], kernel_initializer='he_uniform', activation='relu'))
+            model.add(Dense(hyper_params['fc_layers'][l], input_dim=X_train.shape[1], 
+                            kernel_initializer='he_uniform', activation='relu'))
         else:
             model.add(BatchNormalization())
             model.add(Dropout(0.1))
@@ -878,8 +1063,8 @@ def train_model (X_train, X_val, y_train, y_val, sup_model_type, learning_task_t
     y_val = np.expand_dims(y_val, axis=1)
     
     if sup_model_type == 'mlp': 
-        model, history = get_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
-        plot_model_train_info (history)
+        model, history = get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
+        plot_model_train_info (history['train_losses'], history['val_losses'])
     elif sup_model_type == 'xgb':
         model, history = get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
     elif sup_model_type == 'tabnet':
@@ -887,17 +1072,17 @@ def train_model (X_train, X_val, y_train, y_val, sup_model_type, learning_task_t
     else:    
         print('Do not know model')
 
-    return model, history    
+    return model 
 
 
 #==========================================
 # Plotting functions
 #==========================================
 
-def plot_model_train_info (history):
+def plot_model_train_info (train_losses, val_losses):
     plt.figure(1)
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
+    plt.plot(train_losses)
+    plt.plot(val_losses)
     plt.title('model loss')
     plt.ylabel('loss')
     plt.xlabel('epoch')
