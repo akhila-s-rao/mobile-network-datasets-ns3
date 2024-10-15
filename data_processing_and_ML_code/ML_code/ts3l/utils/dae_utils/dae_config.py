@@ -60,10 +60,17 @@ class DAEConfig(BaseConfig):
     num_categoricals: Optional[int] = field(default=None)
     
     num_continuous: Optional[int] = field(default=None)
+
+    # Akhila
+    #pred_head_depth: int = field(default=1)
     
     def __post_init__(self):
         super().__post_init__()
-        
+
+        # Akhila
+        #if pred_head_depth > 2:
+        #    raise ValueError("Cannot currently handle prediction head depth higher than 2")
+            
         if self.noise_type not in ["Swap", "Gaussian", "Zero_Out"]:
             raise ValueError('The noise type must be one of ["Swap", "Gaussian", "Zero_Out"], but %s.' % self.noise_type)
         

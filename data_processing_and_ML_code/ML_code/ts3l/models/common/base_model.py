@@ -15,8 +15,10 @@ class TS3LModule(ABC, nn.Module):
                 cls.set_first_phase(self)
             return new_init
         cls.__init__ = init_decorator(cls.__init__) # type: ignore
-        
-        
+
+    # Akhila
+    pred_head_size = None 
+    
     @property
     @abstractmethod
     def encoder(self):
@@ -27,10 +29,23 @@ class TS3LModule(ABC, nn.Module):
         """
         self.forward = self._first_phase_step
         self.encoder.requires_grad_(True)
+
+    # Akhila
+    #def get_first_phase_output(self, x: torch.Tensor) -> torch.Tensor:
+    #    # Get the output of the enmedding layers 
+    #    print('Inside get_first_phase_output function')
+    #    print(self.encoder)
+    #    print(x)
+    #    return self.encoder(x)
+        
     
-    def set_second_phase(self, freeze_encoder: bool = True):
+    # Akhila
+    def set_second_phase(self, freeze_encoder: bool = True, pred_head_size: int = 1):
         """Set second phase step as the forward pass
         """
+        # Akhila 
+        self.pred_head_size = pred_head_size
+        
         self.forward = self._second_phase_step
         self.encoder.requires_grad_(not freeze_encoder)
     

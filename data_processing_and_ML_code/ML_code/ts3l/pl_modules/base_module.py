@@ -95,13 +95,43 @@ class TS3LLightining(ABC, pl.LightningModule):
         self.validation_step = self._first_phase_step # type: ignore
         self.on_validation_epoch_end = self._first_phase_validation_epoch_end # type: ignore
 
-    def set_second_phase(self, freeze_encoder: bool) -> None:
+    # Akhila
+    def get_first_phase_output(self, dataloader) -> torch.Tensor:
+        # Get the output of the enmedding layers 
+        print('Inside get_first_phase_output function')
+        print(self.model.encoder)
+        print(dataloader)
+        # Turn off gradient calculations since this is inference
+        self.model.encoder.eval()
+        
+        outputs = []
+        with torch.no_grad():
+            for batch in dataloader:
+                print('input batch: ', batch)
+                # Assuming the input data is the first element in the batch
+                input_data = batch[0]
+                
+                # Feed the data into the encoder
+                encoded_output = self.model.encoder(input_data)
+                print('output embedding: ', encoded_output)
+                # Append the encoded output to the list
+                outputs.append(encoded_output)
+        
+        # Concatenate all outputs into a single tensor
+        encoded_outputs_tensor = torch.cat(outputs, dim=0)
+        
+        # Now `encoded_outputs_tensor` contains the encoded representation of your entire dataset
+        print(encoded_outputs_tensor.shape)
+
+        return encoded_outputs_tensor
+        
+    def set_second_phase(self, freeze_encoder: bool, pred_head_size: int = 1) -> None:
         """Set the module to fine-tuning
         
         Args:
             freeze_encoder (bool): If True, the encoder will be frozen during fine-tuning. Otherwise, the encoder will be trainable.
         """
-        self.model.set_second_phase(freeze_encoder)
+        self.model.set_second_phase(freeze_encoder, pred_head_size)
         self.training_step = self._second_phase_step # type: ignore
         self.on_validation_start = self._on_second_phase_validation_start # type: ignore
         self.validation_step = self._second_phase_step # type: ignore
@@ -226,7 +256,8 @@ class TS3LLightining(ABC, pl.LightningModule):
             train_score = self.metric(y_hat, y)
             
             self.log("train_loss", train_loss, prog_bar = True)
-            self.log("train_" + self.metric.__name__, train_score, prog_bar = True)
+            # Akhila did this to reduce the values seen on screen 
+            #self.log("train_" + self.metric.__name__, train_score, prog_bar = True)
             self.second_phase_step_outputs = []   
             
         return super().on_validation_start()
@@ -242,7 +273,8 @@ class TS3LLightining(ABC, pl.LightningModule):
         val_score = self.metric(y_hat, y)
 
         self.log("val_" + self.metric.__name__, val_score, prog_bar = True)
-        self.log("val_loss", val_loss, prog_bar = True)
+        # Akhila did this to reduce the values seen on screen 
+        #self.log("val_loss", val_loss, prog_bar = True)
         self.second_phase_step_outputs = []      
         return super().on_validation_epoch_end()
     

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, OrderedDict
 from ts3l.models.common import TS3LModule
 from ts3l.models.switchtab.ft_transformer import FTTransformer
 
@@ -95,7 +95,35 @@ class SwitchTab(TS3LModule):
         self.projector_m = Projector(hidden_dim)
         self.projector_s = Projector(hidden_dim)
         self.decoder = Decoder(input_dim, hidden_dim)
+        # Original
         self.head = nn.Linear(hidden_dim, output_dim)
+        
+        # Akhila # single hidden layer in head
+        self.one_layer_prediction_head = nn.Sequential(
+            OrderedDict([
+                ("head_linear_hid", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(0.1)),
+                ("head_linear_out", nn.Linear(hidden_dim, output_dim))
+            ])
+        )
+        
+        # Akhila # 2 hidden layers in head
+        self.two_layer_prediction_head = nn.Sequential(
+            OrderedDict([
+                ("head_linear_hid1", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation1", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_hid2", nn.Linear(hidden_dim, 100)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation2", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_out", nn.Linear(100, output_dim))
+            ])
+        )
+        
         self.activation = nn.SiLU()
 
     @property
@@ -169,7 +197,17 @@ class SwitchTab(TS3LModule):
                 from the input.
         """
         emb = self.encoder(x)
-        y_hat = self.head(self.activation(emb))
+        # Akhila
+        if self.pred_head_size == 1:
+            y_hat = self.one_layer_prediction_head(self.activation(emb))
+            #print('using 1 layer head')
+        else:
+            y_hat = self.two_layer_prediction_head(self.activation(emb))
+            #print('using 2 layer head')
+        
+        #y_hat = self.head(self.activation(emb))
+        
+        
         if not self.return_salient_feature:
             return y_hat
         else:

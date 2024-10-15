@@ -44,6 +44,14 @@ class VIMEConfig(BaseConfig):
         ValueError: Raised if both `num_categoricals` and `num_continuous` are None, indicating that at least one attribute must be specified.
         
     """
+    # Akhila added these
+    encoder_depth: int = field(default=4)
+
+    #head_depth: int = field(default=2)
+    
+    dropout_rate: float = field(default=0.04)
+
+
     
     hidden_dim: int = field(default=256)
     
@@ -62,6 +70,7 @@ class VIMEConfig(BaseConfig):
     K: int = field(default=3)
     
     p_m: float = field(default=0.3)
+    
     
     def __post_init__(self):
         super().__post_init__()

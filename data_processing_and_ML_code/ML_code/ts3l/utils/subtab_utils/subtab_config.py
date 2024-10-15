@@ -41,6 +41,15 @@ class SubTabConfig(BaseConfig):
     """
     
     hidden_dim: int = field(default=256)
+
+    # Akhila added these 
+    encoder_depth: int = field(default=1)
+    
+    #head_depth: int = field(default=2)
+
+    dropout_rate: float = field(default=0.04)
+
+    
     
     tau: float = field(default=0.1)
     

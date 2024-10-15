@@ -45,7 +45,10 @@ class VIMELightning(TS3LLightining):
         del config["p_m"]
         
         self.mask_loss_fn = nn.BCELoss()
-        self.categorical_feature_loss_fn = nn.CrossEntropyLoss()
+        # Akhila changed this to fix the not handling output layer of categorical features bug
+        #self.categorical_feature_loss_fn = nn.CrossEntropyLoss()
+        self.categorical_feature_loss_fn = nn.BCELoss()
+        
         self.continuous_feature_loss_fn = nn.MSELoss()
         
         self.consistency_loss_fn = nn.MSELoss()
@@ -106,15 +109,17 @@ class VIMELightning(TS3LLightining):
         loss = task_loss + self.beta * consistency_loss
         
         return loss, labeled_y, labeled_y_hat
-    
-    def set_second_phase(self, freeze_encoder: bool = True) -> None:
+
+    # Akhila
+    def set_second_phase(self, freeze_encoder: bool = True, pred_head_size: int = 1) -> None:
         """Set the module to fine-tuning
         
         Args:
             freeze_encoder (bool): If True, the encoder will be frozen during fine-tuning. Otherwise, the encoder will be trainable.
                                     Default is True.
         """
-        return super().set_second_phase(freeze_encoder)
+        # Akhila
+        return super().set_second_phase(freeze_encoder, pred_head_size)
     
     def predict_step(self, batch, batch_idx: int
         ) -> torch.FloatTensor:

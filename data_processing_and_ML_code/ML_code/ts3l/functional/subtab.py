@@ -58,7 +58,7 @@ def first_phase_step(
     x, _, _ = batch
     
     projections, x_recons = model(x)
-    
+
     return projections, x_recons
 
 
@@ -82,7 +82,6 @@ def first_phase_loss(
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: The total loss, contrastive loss, reconstruction loss, 
                                                                         and distance loss during the first phase of learning.
     """
-    
     x_originals = get_duplicated_input(x_originals, n_subsets)
     
     arranged_projections = arrange_tensors(projections, n_subsets)
@@ -105,6 +104,9 @@ def second_phase_step(
         torch.Tensor: The predicted label (logit).
     """
     x, _, _ = batch
+
+    out = model(x).squeeze()
+    
     return model(x).squeeze()
 
 def second_phase_loss(

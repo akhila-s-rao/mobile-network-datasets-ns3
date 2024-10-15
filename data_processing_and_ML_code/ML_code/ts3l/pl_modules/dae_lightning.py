@@ -40,7 +40,10 @@ class DAELightning(TS3LLightining):
         del config["noise_ratio"]
 
         self.mask_loss_fn = nn.BCELoss()
-        self.categorical_feature_loss = nn.CrossEntropyLoss()
+        # Akhila changed this to fix the not handling output layer of categorical features bug
+        #self.categorical_feature_loss = nn.CrossEntropyLoss()
+        self.categorical_feature_loss = nn.BCELoss()
+        
         self.continuous_feature_loss = nn.MSELoss()
 
         self._init_model(DAE, config)
@@ -71,7 +74,7 @@ class DAELightning(TS3LLightining):
             self.categorical_feature_loss,
             self.continuous_feature_loss,
         )
-        
+
         return mask_loss * self.mask_loss_weight + feature_loss
 
     def _get_second_phase_loss(self, batch: Tuple[torch.Tensor, torch.Tensor]):
@@ -93,23 +96,17 @@ class DAELightning(TS3LLightining):
 
         return loss, y, y_hat
 
-    def set_second_phase(self, freeze_encoder: bool = True) -> None:
+    # Akhila
+    def set_second_phase(self, freeze_encoder: bool = True, pred_head_size: int = 1) -> None:
         """Set the module to fine-tuning
         
         Args:
             freeze_encoder (bool): If True, the encoder will be frozen during fine-tuning. Otherwise, the encoder will be trainable.
                                     Default is True.
         """
-        return super().set_second_phase(freeze_encoder)
-    
-    # Akhila added this 
-    #def set_second_phase_config(self, config: DAEConfig): -> None:
-    #    
-    #    self. = config.task
-    #    = config.loss_fn 
-    #    = config.output_dim 
-    #    = config.metric
-    #    return
+        # Akhila
+        return super().set_second_phase(freeze_encoder, pred_head_size)
+
     
     def predict_step(self, batch, batch_idx: int) -> torch.FloatTensor:
         """The predict step of DAE

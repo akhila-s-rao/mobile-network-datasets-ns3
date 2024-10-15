@@ -32,10 +32,14 @@ class SCARF(TS3LModule):
         """
         super(SCARF, self).__init__()
 
-        self.__encoder = MLP(input_dim, hidden_dim, encoder_depth)
+        # Akhila added this to disable batchnorm. I need to make this settable from the Config Later.  
+        batchnorm = False
+        
+        self.__encoder = MLP(input_dim, hidden_dim, encoder_depth, batchnorm)
 
-        self.pretraining_head = MLP(hidden_dim, hidden_dim, head_depth)
+        self.pretraining_head = MLP(hidden_dim, hidden_dim, head_depth, batchnorm)
 
+        # Original
         #self.head = nn.Sequential(
         #    OrderedDict([
         #        ("head_activation", nn.ReLU(inplace=True)),
@@ -44,14 +48,30 @@ class SCARF(TS3LModule):
         #        ("head_linear", nn.Linear(hidden_dim, output_dim))
         #    ])
         #)
-        self.head = nn.Sequential(
+        
+        # Akhila # single hidden layer in head
+        self.one_layer_prediction_head = nn.Sequential(
             OrderedDict([
-                ("head_activation_0", nn.ReLU(inplace=True)),
-                ("head_linear_0", nn.Linear(hidden_dim, hidden_dim)),
-                ("head_activation_1", nn.ReLU(inplace=True)),
-                ("head_linear_1", nn.Linear(hidden_dim, 100)),
-                ("head_activation_2", nn.ReLU(inplace=True)),
-                ("head_linear_2", nn.Linear(100, output_dim))
+                ("head_linear_hid", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(0.1)),
+                ("head_linear_out", nn.Linear(hidden_dim, output_dim))
+            ])
+        )
+        
+        # Akhila # 2 hidden layers in head
+        self.two_layer_prediction_head = nn.Sequential(
+            OrderedDict([
+                ("head_linear_hid1", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation1", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_hid2", nn.Linear(hidden_dim, 100)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation2", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_out", nn.Linear(100, output_dim))
             ])
         )
 
@@ -74,6 +94,13 @@ class SCARF(TS3LModule):
     
     def _second_phase_step(self, x) -> torch.Tensor:
         emb = self.encoder(x)
-        output = self.head(emb)
-
+        if self.pred_head_size == 1:
+            output = self.one_layer_prediction_head(emb)
+            #print('using 1 layer head')
+        else:
+            output = self.two_layer_prediction_head(emb)
+            #print('using 2 layer head')
+        
+        #output = self.head(emb)
+        
         return output

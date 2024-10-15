@@ -46,6 +46,14 @@ def first_phase_loss(
     Returns:
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The losses for mask estimation and feature reconstruction
     """
+
+    # Akhila added this to make it so that the categorical feature gets and output layer
+    
+    # I should be using sigmoid here and adding num_class neurons in the outpout for the categorical features, 
+    # But that needs more effort, and since I already know that my feature here is only 2 clasess
+    # I shall just use a sigmoid and BCE loss instead 
+    cat_feature_preds = torch.sigmoid(cat_feature_preds)
+    
     mask_loss = mask_loss_fn(mask_preds, mask)
     categorical_feature_loss = torch.tensor(0.0, device=mask_preds.device)
     continuous_feature_loss = torch.tensor(0.0, device=mask_preds.device)

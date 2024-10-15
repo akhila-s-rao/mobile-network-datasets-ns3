@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from typing import Tuple, Union
+from typing import Tuple, Union, OrderedDict
 from ts3l.models.common import TS3LModule
 from ts3l.functional.subtab import arrange_tensors
 class ShallowEncoder(nn.Module):
@@ -11,16 +11,35 @@ class ShallowEncoder(nn.Module):
                  hidden_dim : int,
                  n_subsets : int,
                  overlap_ratio : float,
+                 encoder_depth = 1,
+                 dropout_rate = 0.04
     ) -> None:
         super().__init__()
 
         n_column_subset = int(feat_dim / n_subsets)
         n_overlap = int(overlap_ratio * n_column_subset)
 
-        self.net = nn.Sequential(
-            nn.Linear(n_column_subset + n_overlap, hidden_dim),
-            nn.LeakyReLU(),
-        )
+        # Original
+        #self.net = nn.Sequential(
+        #    nn.Linear(n_column_subset + n_overlap, hidden_dim),
+        #    nn.LeakyReLU(),
+        #)
+
+        layers = []
+        in_dim = n_column_subset + n_overlap
+        print(feat_dim, n_subsets, overlap_ratio, n_column_subset)
+        print(n_column_subset, n_overlap)
+        for _ in range(encoder_depth - 1):
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.LeakyReLU(inplace=True))
+            layers.append(torch.nn.Dropout(dropout))
+            in_dim = hidden_dim
+
+        layers.append(nn.Linear(in_dim, hidden_dim))
+        # Combine the layers using nn.Sequential
+        self.net = nn.Sequential(*layers)
+
         
     def forward(self,
                 x : torch.Tensor
@@ -45,10 +64,12 @@ class AutoEncoder(nn.Module):
                  hidden_dim : int,
                  n_subsets : int,
                  overlap_ratio : float,
+                 encoder_depth = 1,
+                 dropout_rate = 0.04
     ) -> None:
         super().__init__()
 
-        self.encoder = ShallowEncoder(feat_dim, hidden_dim, n_subsets, overlap_ratio)
+        self.encoder = ShallowEncoder(feat_dim, hidden_dim, n_subsets, overlap_ratio, encoder_depth, dropout_rate)
         self.decoder = ShallowDecoder(hidden_dim, feat_dim)
 
         self.projection_net = nn.Sequential(
@@ -76,9 +97,10 @@ class SubTab(TS3LModule):
                  input_dim: int,
                  output_dim: int,
                  hidden_dim: int,
-                 
                  n_subsets: int,
                  overlap_ratio: float,
+                 encoder_depth = 1,
+                 dropout_rate = 0.04
     ) -> None:
         super(SubTab, self).__init__()
 
@@ -86,10 +108,37 @@ class SubTab(TS3LModule):
         
         self.n_subsets = n_subsets
         
-        self.__auto_encoder = AutoEncoder(self.feat_dim, hidden_dim, n_subsets, overlap_ratio)
+        self.__auto_encoder = AutoEncoder(self.feat_dim, hidden_dim, n_subsets, overlap_ratio, encoder_depth, dropout_rate)
+
+        # Original
+        #self.head = nn.Sequential(
+        #    nn.Linear(hidden_dim, output_dim)
+        #)
+
+        # Akhila # single hidden layer in head
+        self.one_layer_prediction_head = nn.Sequential(
+            OrderedDict([
+                ("head_linear_hid", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(0.1)),
+                ("head_linear_out", nn.Linear(hidden_dim, output_dim))
+            ])
+        )
         
-        self.head = nn.Sequential(
-            nn.Linear(hidden_dim, output_dim)
+        # Akhila # 2 hidden layers in head
+        self.two_layer_prediction_head = nn.Sequential(
+            OrderedDict([
+                ("head_linear_hid1", nn.Linear(hidden_dim, hidden_dim)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation1", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_hid2", nn.Linear(hidden_dim, 100)),
+                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
+                ("head_activation2", nn.ReLU(inplace=True)),
+                #("head_dropout", nn.Dropout(dropout_rate)),
+                ("head_linear_out", nn.Linear(100, output_dim))
+            ])
         )
 
     @property
@@ -110,7 +159,14 @@ class SubTab(TS3LModule):
         latent = arrange_tensors(latent, self.n_subsets)
         
         latent = latent.reshape(x.shape[0] // self.n_subsets, self.n_subsets, -1).mean(1)
-        out = self.head(latent)
+
+        # Akhila
+        if self.pred_head_size == 1:
+            out = self.one_layer_prediction_head(latent)
+        else:
+            out = self.two_layer_prediction_head(latent)
+            
+        #out = self.head(latent)
 
         if return_embeddings:
             return out, latent
