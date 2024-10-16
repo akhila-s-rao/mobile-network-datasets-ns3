@@ -1,0 +1,258 @@
+Summary: Find the right hyperparameters for the supervised MLP (pytorch lightning verison)
+
+
+I have gone though many iteraitons
+Only 1K samples were tested on to speed up the proces 
+The full results for 1 and 2 layers with the nest of everything else is stored as csv
+
+These are the values I wnated to tweak 
+
+lr = 0.001, 0.0001, 0.00001 (0.0001 is best)
+number of layers = 1 or 2  
+size of hidden layer = 500 or 200 
+# epochs = 50, 100 (100 is mildly better)
+with or without BN ands DO (without is better)
+dropout_rate = 0.1, 0.5 (without is better)
+
+
+
+HO 1
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [500, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.00001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+                                                 MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps     0.228753  1.314413  0.467020
+vrFragment_trace.txt_vr_burst_thput_mbps   11.739128  0.882127 -0.405590
+vrFragment_trace.txt_vr_frag_time         115.401812  0.830965 -0.599694
+vrFragment_trace.txt_vr_burst_time        116.873434  0.831356 -0.599425
+delay_trace.txt_ul_delay                   16.331793  0.669321 -0.332389
+delay_trace.txt_dl_delay                   11.478221  0.328583 -0.086652
+
+HO 2
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [500, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.210029  0.735486  0.512635
+vrFragment_trace.txt_vr_burst_thput_mbps   7.481645  0.838290  0.555443
+vrFragment_trace.txt_vr_frag_time         33.371174  0.805156  0.774628
+vrFragment_trace.txt_vr_burst_time        34.325061  0.967790  0.793635
+delay_trace.txt_ul_delay                   9.471898  0.442573  0.153367
+delay_trace.txt_dl_delay                   7.973539  0.722955  0.553013
+
+
+
+HO 3
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [500, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.208671  1.016310  0.556373
+vrFragment_trace.txt_vr_burst_thput_mbps   8.700148  1.098810  0.498841
+vrFragment_trace.txt_vr_frag_time         38.912979  0.779924  0.747964
+vrFragment_trace.txt_vr_burst_time        38.889880  0.842920  0.756733
+delay_trace.txt_ul_delay                   8.384043  0.374213  0.225979
+delay_trace.txt_dl_delay                   8.958025  0.938937  0.582550
+
+
+
+===========================================================================
+HO 4
+# Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+   
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.225882  1.204446  0.537799
+vrFragment_trace.txt_vr_burst_thput_mbps  10.871510  0.922801  0.163029
+vrFragment_trace.txt_vr_frag_time         87.180304  0.778763 -0.334464
+vrFragment_trace.txt_vr_burst_time        86.740773  0.752649 -0.302311
+delay_trace.txt_ul_delay                  10.947182  0.431846 -0.127785
+delay_trace.txt_dl_delay                  10.372863  0.630204  0.146682
+
+HO 5
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.00001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.291961  1.185302  0.195876
+vrFragment_trace.txt_vr_burst_thput_mbps  15.981264  0.896930 -0.840004
+vrFragment_trace.txt_vr_frag_time         96.810701  0.844443 -0.635694
+vrFragment_trace.txt_vr_burst_time        97.273873  0.819842 -0.620804
+delay_trace.txt_ul_delay                  15.665013  0.680468 -0.425362
+delay_trace.txt_dl_delay                  10.878464  0.280395 -0.130094
+
+HO 6
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+                                    MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.211397  1.027064  0.569322
+vrFragment_trace.txt_vr_burst_thput_mbps   8.915277  1.095423  0.479975
+vrFragment_trace.txt_vr_frag_time         43.414409  0.951934  0.702122
+vrFragment_trace.txt_vr_burst_time        43.523227  1.005379  0.709584
+delay_trace.txt_ul_delay                   8.555170  0.379078  0.190080
+delay_trace.txt_dl_delay                  10.312396  1.142995  0.506884
+
+HO 7
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 150, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.200610  0.770063  0.573128
+vrFragment_trace.txt_vr_burst_thput_mbps   8.400131  1.009971  0.518087
+vrFragment_trace.txt_vr_frag_time         35.843646  0.709293  0.770224
+vrFragment_trace.txt_vr_burst_time        35.534159  0.740003  0.783243
+delay_trace.txt_ul_delay                   8.384581  0.377527  0.238756
+delay_trace.txt_dl_delay                   8.166326  0.814069  0.613842
+=====================================================
+
+HO 8
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': True,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.234057  1.397850  0.497582
+vrFragment_trace.txt_vr_burst_thput_mbps  11.368370  0.815514  0.022910
+vrFragment_trace.txt_vr_frag_time         95.099340  0.838865 -0.549050
+vrFragment_trace.txt_vr_burst_time        95.505387  0.814383 -0.534545
+delay_trace.txt_ul_delay                  14.167665  0.639358 -0.116730
+delay_trace.txt_dl_delay                   9.458973  0.290123  0.193332
+
+=====================================================
+HO 9
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': True,
+        'dropout_rate': 0.1,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.211560  0.994954  0.568149
+vrFragment_trace.txt_vr_burst_thput_mbps   8.941562  1.099063  0.478068
+vrFragment_trace.txt_vr_frag_time         43.471702  0.953002  0.701149
+vrFragment_trace.txt_vr_burst_time        43.644254  1.010841  0.708337
+delay_trace.txt_ul_delay                   8.537145  0.376820  0.184435
+delay_trace.txt_dl_delay                  10.442908  1.159023  0.497024
+
+HO 10
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 50,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': True,
+        'dropout_rate': 0.5,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.230540  0.966643  0.492176
+vrFragment_trace.txt_vr_burst_thput_mbps   9.129676  1.090894  0.457932
+vrFragment_trace.txt_vr_frag_time         44.530796  0.969777  0.688696
+vrFragment_trace.txt_vr_burst_time        44.712191  1.027607  0.692764
+delay_trace.txt_ul_delay                   8.382564  0.357040  0.143569
+delay_trace.txt_dl_delay                  11.293336  1.248049  0.413615
+
+
+
+
+
+===========================================
+HO 11
+    # Hyperparameters for supervised MLP training
+    hypp_sup_mlp={
+        'fc_layers': [200, 100], # the hidden layers
+        'batch_size': 64,  
+        'max_epochs': 100,
+        'patience': 15,
+        'learning_rate': 0.0001,
+        'use_batchnorm': False,
+        'use_dropout': False,
+        'dropout_rate': 0.1,
+
+                                                MAE      MAPE        R2
+vrFragment_trace.txt_vr_frag_thput_mbps    0.211641  1.074486  0.545885
+vrFragment_trace.txt_vr_burst_thput_mbps   8.492522  1.062689  0.511903
+vrFragment_trace.txt_vr_frag_time         36.746850  0.663350  0.768641
+vrFragment_trace.txt_vr_burst_time        36.929426  0.716488  0.774681
+delay_trace.txt_ul_delay                   8.326554  0.373781  0.254227
+delay_trace.txt_dl_delay                   8.374740  0.871581  0.616381
+
+
+iteration 4 Repeat pretraining after equalizing encoder depth 
+epochs = 100, dropout to 0.1
+decide on encoder depth 3 or 4 ?
+
+
+
+

@@ -128,8 +128,8 @@ def s3l_training(pretrain, use_pretrained_model,
     #num_test_runs = 1 # 3
     #train_test_run_nums = np.array(range(11, 12+1))
     
-    #pretrain_runs = range(1, 10 + 1)
-    pretrain_runs = range(1, 1 + 1)
+    pretrain_runs = range(1, 10 + 1)
+    #pretrain_runs = range(1, 1 + 1)
     
     # Create the pretrain_models_folder if it does not already exist
     if not os.path.isdir(pretrain_models_folder):
@@ -149,8 +149,13 @@ def s3l_training(pretrain, use_pretrained_model,
         
         # Remove the rows that do not represent an instance where there is traffic in the network
         # This basically translates to removing rows which have no non NaN learning_task values
+        # Results in 33K samples
         traffic_cols = list(set(learning_tasks) - {'delay_trace.txt_ul_delay', 
                       'delay_trace.txt_dl_delay'})
+        # Results in 102K samples 
+        #traffic_cols = list(set(all_learning_tasks_in_data) - {'delay_trace.txt_ul_delay', 
+        #              'delay_trace.txt_dl_delay'})
+        
         pretrain_data = make_data_pretrain_ready (pretrain_data, traffic_cols)
         
         # Remove the labels of all prediction tasks which are also in the dataset 
@@ -462,7 +467,7 @@ def s3l_training(pretrain, use_pretrained_model,
                     elif pred_head_type == 'ts3l':
                         
                         # prepare a trainer 
-                        sup_trainer = Trainer(accelerator = 'gpu',
+                        sup_trainer = Trainer(logger=False, accelerator = 'gpu',
                                               max_epochs = s3l_hyp_pred_head['max_epochs'], 
                                               #early_stopping, model_checkpoint
                                               enable_progress_bar=True,
@@ -475,6 +480,13 @@ def s3l_training(pretrain, use_pretrained_model,
                         #best_model_path = model_checkpoint.best_model_path
                         #print(f"Best model path: {best_model_path}")
                         #ssl_model = DAELightning.load_from_checkpoint(best_model_path)
+
+                        # Get train and validation loss and metric
+                        #plot_model_train_info (train_losses, val_losses):
+                        #ssl_model.second_phase_train_loss
+                        #ssl_model.second_phase_val_loss
+                        #ssl_model.second_phase_val_metric
+                        
 
                         if learning_task_type == 'reg':
                             yhat_test = sup_trainer.predict(ssl_model, test_dl)

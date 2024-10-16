@@ -58,6 +58,14 @@ class TS3LLightining(ABC, pl.LightningModule):
         self.second_phase_step_outputs: List[Dict[str, Any]] = []
         
         self.save_hyperparameters()
+
+        # Akhila 15 oct 
+        # Initialize lists to store losses
+        self.first_phase_train_loss = []
+        self.first_phase_val_loss = []
+        self.second_phase_train_loss = []
+        self.second_phase_val_loss = []
+        self.second_phase_val_metric = []
     
     @abstractmethod
     def _initialize(self, config: Dict[str, Any]) -> None:
@@ -192,6 +200,9 @@ class TS3LLightining(ABC, pl.LightningModule):
             train_loss = torch.Tensor([out["loss"] for out in self.first_phase_step_outputs]).cpu().mean()
             
             self.log("train_loss", train_loss, prog_bar = True)
+            # Akhila 15 oct
+            # Trying to save this in the module itself to access later
+            self.first_phase_train_loss.append(train_loss)
             
             self.first_phase_step_outputs = []    
         return super().on_validation_start() 
@@ -202,6 +213,10 @@ class TS3LLightining(ABC, pl.LightningModule):
         val_loss = torch.Tensor([out["loss"] for out in self.first_phase_step_outputs]).cpu().mean()
 
         self.log("val_loss", val_loss, prog_bar = True)
+        # Akhila 15 oct
+        # Trying to save this in the module itself to access later
+        self.first_phase_val_loss.append(val_loss)
+        
         self.first_phase_step_outputs = []
         return super().on_validation_epoch_end()
 
@@ -256,6 +271,11 @@ class TS3LLightining(ABC, pl.LightningModule):
             train_score = self.metric(y_hat, y)
             
             self.log("train_loss", train_loss, prog_bar = True)
+            
+            # Akhila 15 oct
+            # Trying to save this in the module itself to access later
+            self.second_phase_train_loss.append(train_loss)
+            
             # Akhila did this to reduce the values seen on screen 
             #self.log("train_" + self.metric.__name__, train_score, prog_bar = True)
             self.second_phase_step_outputs = []   
@@ -271,7 +291,13 @@ class TS3LLightining(ABC, pl.LightningModule):
         y = torch.cat([out["y"].cpu() for out in self.second_phase_step_outputs if out["y"].numel() != 1])
         y_hat = torch.cat([out["y_hat"].cpu() for out in self.second_phase_step_outputs if out["y_hat"].numel() != 1])
         val_score = self.metric(y_hat, y)
-
+        
+        # Akhila 15 oct
+        # Trying to save this in the module itself to access later
+        self.second_phase_val_loss.append(val_loss)
+        self.second_phase_val_metric.append(val_score)
+        
+        
         self.log("val_" + self.metric.__name__, val_score, prog_bar = True)
         # Akhila did this to reduce the values seen on screen 
         #self.log("val_loss", val_loss, prog_bar = True)

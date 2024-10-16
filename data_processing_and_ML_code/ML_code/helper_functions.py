@@ -551,10 +551,10 @@ def get_cont_and_cat_cols(df):
 
 
 def make_data_pretrain_ready (pretrain_data: pd.DataFrame, traffic_cols):
-    # Remove the rows that do not represent an instance where there is traffic in the network
-    # This basically translates to removing rows which have no non NaN learning_task values  
+    # Drop the rows that do not represent an instance where there is traffic in the network 
+    # from the perspective of the traffic_cols columns  
     print('pretrain_data, before removing rows that dont have traffic ', pretrain_data.shape)
-    pretrain_data = pretrain_data.dropna(subset=traffic_cols, axis=0)
+    pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
     print('pretrain_data, after removing rows that dont have traffic ', pretrain_data.shape)
     
     return pretrain_data
@@ -805,7 +805,7 @@ def s3l_pretrain_with_subtab(X_unlabeled, continuous_cols, categorical_cols, hyp
                           use_distance=hypp['use_distance'], n_subsets=hypp['n_subsets'], overlap_ratio=hypp['overlap_ratio'],
                           mask_ratio=hypp['mask_ratio'], noise_type=hypp['noise_type'])
 
-    pl_subtab = SubTabLightning(config)
+    pl_module = SubTabLightning(config)
     # create a train and validation set 
     X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
     X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
@@ -818,11 +818,12 @@ def s3l_pretrain_with_subtab(X_unlabeled, continuous_cols, categorical_cols, hyp
                                 train_collate_fn=SubTabCollateFN(config), valid_collate_fn=SubTabCollateFN(config), n_jobs = 5)
     checkpoint_callback = get_checkpoint(save_path)
     
-    trainer = Trainer(accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
-    trainer.fit(pl_subtab, datamodule)
+    trainer.fit(pl_module, datamodule)
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
 
-    return pl_subtab, trainer
+    return pl_module, trainer
 
 def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, hypp, save_path):
     
@@ -831,7 +832,7 @@ def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, 
                              input_dim=X_unlabeled.shape[1], hidden_dim=hypp['hidden_dim'], output_dim=1, 
                              encoder_depth=hypp['encoder_depth'], n_head = hypp['n_head'], u_label = hypp['u_label'])
 
-    pl_switchtab = SwitchTabLightning(config)
+    pl_module = SwitchTabLightning(config)
     # create a train and validation set 
     X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
     X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
@@ -843,11 +844,12 @@ def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, 
                                 train_collate_fn=SwitchTabFirstPhaseCollateFN(), valid_collate_fn=SwitchTabFirstPhaseCollateFN(), n_jobs = 5)
     
     checkpoint_callback = get_checkpoint(save_path)
-    trainer = Trainer(accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, ccelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
-    trainer.fit(pl_switchtab, datamodule)
+    trainer.fit(pl_module, datamodule)
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
 
-    return pl_switchtab, trainer
+    return pl_module, trainer
 
         
 def s3l_pretrain_with_scarf(X_unlabeled, continuous_cols, categorical_cols, hypp, save_path):
@@ -858,7 +860,7 @@ def s3l_pretrain_with_scarf(X_unlabeled, continuous_cols, categorical_cols, hypp
                          output_dim=1, encoder_depth=hypp['encoder_depth'], head_depth=hypp['head_depth'],
                          dropout_rate=hypp['dropout_rate'], corruption_rate = hypp['corruption_rate']) 
     
-    pl_scarf = SCARFLightning(config)
+    pl_module = SCARFLightning(config)
     # create a train and validation set 
     X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
     X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
@@ -869,11 +871,12 @@ def s3l_pretrain_with_scarf(X_unlabeled, continuous_cols, categorical_cols, hypp
     
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = 5)
     checkpoint_callback = get_checkpoint(save_path)
-    trainer = Trainer(accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
-    trainer.fit(pl_scarf, datamodule)
+    trainer.fit(pl_module, datamodule)
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
 
-    return pl_scarf, trainer
+    return pl_module, trainer
 
 def s3l_pretrain_with_vime(X_unlabeled, continuous_cols, categorical_cols, hypp, save_path):
     
@@ -885,7 +888,7 @@ def s3l_pretrain_with_vime(X_unlabeled, continuous_cols, categorical_cols, hypp,
         beta=hypp['beta'], K=hypp['K'], p_m = hypp['p_m'],
         num_categoricals=len(categorical_cols), num_continuous=len(continuous_cols))
     
-    pl_vime = VIMELightning(config)
+    pl_module = VIMELightning(config)
     # create a train and validation set 
     X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
     X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
@@ -894,11 +897,12 @@ def s3l_pretrain_with_vime(X_unlabeled, continuous_cols, categorical_cols, hypp,
     valid_ds = VIMEDataset(X = X_valid, config=config, continuous_cols = continuous_cols, category_cols = categorical_cols)
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = 5)
     checkpoint_callback = get_checkpoint(save_path)
-    trainer = Trainer(accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
-    trainer.fit(pl_vime, datamodule)
+    trainer.fit(pl_module, datamodule)
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
     
-    return pl_vime, trainer
+    return pl_module, trainer
 
 
 def s3l_pretrain_with_dae(X_unlabeled, continuous_cols, categorical_cols, hypp, save_path):
@@ -913,7 +917,7 @@ def s3l_pretrain_with_dae(X_unlabeled, continuous_cols, categorical_cols, hypp, 
                        head_depth = hypp['head_depth'], output_dim=1
                       )
         
-    pl_dae = DAELightning(config)
+    pl_module = DAELightning(config)
     # Pretraining
     # create a train and validation set 
     X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
@@ -923,20 +927,12 @@ def s3l_pretrain_with_dae(X_unlabeled, continuous_cols, categorical_cols, hypp, 
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', 
                                 train_collate_fn=DAECollateFN(config), valid_collate_fn=DAECollateFN(config), n_jobs = 5) # made valid_ds None
     checkpoint_callback = get_checkpoint(save_path)
-    trainer = Trainer(accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
-    trainer.fit(pl_dae, datamodule)
-    
-    # Plot the learning curve
-    plt.plot(pl_dae.train_loss, label='Training Loss')
-    plt.plot(pl_dae.val_loss, label='Validation Loss')
-    print('NOTE: Need to check if what I am plotting here is actually per epochs or per batch')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.show()
-    
-    return pl_dae, trainer
+    trainer.fit(pl_module, datamodule)
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+
+    return pl_module, trainer
 
 
 # Takes a pandas df as input and sets up dae pretraining. Returns the model  
@@ -1276,7 +1272,7 @@ def get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hy
         enable_version_counter = False # Whether to append a version to the existing file name.
     )
     
-    trainer = pl.Trainer(accelerator = 'gpu',
+    trainer = pl.Trainer(logger=False, accelerator = 'gpu',
                          max_epochs=hyper_params['max_epochs'],
                          num_sanity_val_steps = 0,
                          callbacks=[MyProgressBar(refresh_rate=10)] # early_stopping, checkpoint_callback, 
