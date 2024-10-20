@@ -11,6 +11,8 @@ logging.getLogger('tensorflow').setLevel(logging.FATAL)
 from helper_functions import *
 from hyperparameters import *
 from compute_plot_save_error import *
+from plotting_functions import *
+from pytorch_mlp import *
 
 # This includes first and second ohase training
 def s3l_training(pretrain, use_pretrained_model, 
@@ -150,12 +152,12 @@ def s3l_training(pretrain, use_pretrained_model,
         # Remove the rows that do not represent an instance where there is traffic in the network
         # This basically translates to removing rows which have no non NaN learning_task values
         # Results in 33K samples
-        traffic_cols = list(set(learning_tasks) - {'delay_trace.txt_ul_delay', 
-                      'delay_trace.txt_dl_delay'})
+        #traffic_cols = list(set(learning_tasks) - {'delay_trace.txt_ul_delay', 
+        #              'delay_trace.txt_dl_delay'})
         # Results in 102K samples 
         #traffic_cols = list(set(all_learning_tasks_in_data) - {'delay_trace.txt_ul_delay', 
         #              'delay_trace.txt_dl_delay'})
-        
+        traffic_cols = pretrain_data.columns # keep all rows 
         pretrain_data = make_data_pretrain_ready (pretrain_data, traffic_cols)
         
         # Remove the labels of all prediction tasks which are also in the dataset 

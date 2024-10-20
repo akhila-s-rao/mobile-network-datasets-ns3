@@ -16,7 +16,6 @@ hypp_sup_xgb_large={
             'clas':'categorical_crossentropy'}
 } 
 
-
 # Hyperparameters for supervised MLP training
 hypp_sup_mlp={
     'fc_layers': None, # Should be taken as input parameter to this function
@@ -58,34 +57,12 @@ s3l_hyp_ssl_dae={
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
     
-    'encoder_depth': 4, #  
+    'encoder_depth': 2, #  
     'head_depth': 2, #
     'dropout_rate': 0.1, #
     
     'noise_type': "Swap", #
     'noise_ratio': 0.3 #
-}
-
-s3l_hyp_ssl_vime={
-    'loss_fn': "MSELoss",
-    #'metric': ["r2_score", "mean_absolute_error"], #
-    'metric': "r2_score", #
-    'hidden_dim': 200, #
-    'max_epochs': 100, #
-    'batch_size': 128, #
-    # not used in the config yet
-    'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
-
-    'encoder_depth': 4, #  
-    # NO HEAD DEPTH
-    'dropout_rate': 0.1, #
-    
-    'p_m': 0.3, # Corruption probability for self-supervised learning
-    
-    'alpha1': 2.0, # Hyper-parameter to control the weights of feature and mask losses
-    'alpha2': 2.0, # Hyper-parameter to control the weights of feature and mask losses
-    'K': 3, # Number of augmented samples
-    'beta': 1.0 # Hyperparameter to control supervised and unsupervised losses
 }
 
 s3l_hyp_ssl_scarf={
@@ -98,11 +75,33 @@ s3l_hyp_ssl_scarf={
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
     
-    'encoder_depth': 4,
+    'encoder_depth': 2,
     'head_depth': 2,
     'dropout_rate': 0.1, #
     
     'corruption_rate': 0.3
+}
+
+s3l_hyp_ssl_vime={
+    'loss_fn': "MSELoss",
+    #'metric': ["r2_score", "mean_absolute_error"], #
+    'metric': "r2_score", #
+    'hidden_dim': 200, #
+    'max_epochs': 100, #
+    'batch_size': 128, #
+    # not used in the config yet
+    'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
+
+    'encoder_depth': 2, #  
+    # NO HEAD DEPTH
+    'dropout_rate': 0.1, #
+    
+    'p_m': 0.3, # Corruption probability for self-supervised learning
+    
+    'alpha1': 2.0, # Hyper-parameter to control the weights of feature and mask losses
+    'alpha2': 2.0, # Hyper-parameter to control the weights of feature and mask losses
+    'K': 3, # Number of augmented samples
+    'beta': 1.0 # Hyperparameter to control supervised and unsupervised losses
 }
 
 s3l_hyp_ssl_subtab={
@@ -115,7 +114,7 @@ s3l_hyp_ssl_subtab={
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
     
-    'encoder_depth': 4,
+    'encoder_depth': 2,
     'head_depth': 2,
     # NO DROPOUT
 

@@ -1,0 +1,11 @@
+UlTxPhyStats.txt_rv
+UlTxPhyStats.txt_cell_rv
+UlRlcStats.txt_LCID
+UlRlcStats.txt_cell_LCID
+DlRlcStats.txt_LCID
+DlRlcStats.txt_cell_LCID
+UlPdcpStats.txt_LCID
+UlPdcpStats.txt_cell_LCID
+DlPdcpStats.txt_LCID
+DlPdcpStats.txt_cell_LCID
+cell_conn_type

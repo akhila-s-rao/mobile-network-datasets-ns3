@@ -119,6 +119,7 @@ from ts3l.utils.switchtab_utils import SwitchTabDataset, SwitchTabFirstPhaseColl
 from ts3l.utils.switchtab_utils import SwitchTabConfig
 
 from hyperparameters import *
+from plotting_functions import *
 
 plt.rcParams.update({'font.size': 22})
 
@@ -205,94 +206,7 @@ class MAPELoss(nn.Module):
         loss = torch.mean(torch.abs((y_true - y_pred) / (y_true + epsilon)) * 100)
         return loss
 
-class MLPRegressor(pl.LightningModule):
-    def __init__(self, input_dim, hidden_dims, output_dim, use_batchnorm=True, 
-                 use_dropout=True, dropout_rate=0.1, learning_rate=0.0001, loss_fn_str='MSELoss', bin_edges=None, bin_weights=None):
-        super(MLPRegressor, self).__init__()
-        self.save_hyperparameters()  # Saves all the arguments passed to __init__
-        
-        self.learning_rate = learning_rate
-        # Model layers
-        layers = []
-        # Input to hidden layer
-        for hidden_dim in hidden_dims:
-            layers.append(nn.Linear(input_dim, hidden_dim))
-            # Optionally add BatchNorm layer
-            if use_batchnorm:
-                layers.append(nn.BatchNorm1d(hidden_dim))
-            # ReLU activation
-            layers.append(nn.ReLU())
-            # Optionally add Dropout layer
-            if use_dropout:
-                layers.append(nn.Dropout(dropout_rate))
-            input_dim = hidden_dim
-        
-        # Output layer
-        layers.append(nn.Linear(hidden_dim, output_dim))
-        # Define the model as a sequential container
-        self.model = nn.Sequential(*layers)
 
-        print('loss_fn_str', loss_fn_str)
-        # loss function to use
-        if loss_fn_str == 'MAPELoss':
-            self.loss_fn = MAPELoss()
-        elif loss_fn_str == 'WeightedL1Loss':
-            self.loss_fn = WeightedL1Loss(bin_edges, bin_weights)
-        else:
-            self.loss_fn = getattr(nn, loss_fn_str)()
-        print('USING LOSS FN: ', self.loss_fn)
-        
-        # Initialize lists to store losses
-        self.train_losses = []
-        self.val_losses = []
-        self.val_mapes = []
-
-        # Initialize variables to accumulate losses within an epoch
-        self.train_loss_epoch = []
-        self.val_loss_epoch = []
-        self.val_mape_epoch = []
-
-    
-    def forward(self, x):
-        x = self.model(x)
-        return x
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        #loss = F.mse_loss(y_hat, y)
-        loss = self.loss_fn(y_hat, y)
-        self.train_loss_epoch.append(loss.item())
-        self.log('train_losses', loss, on_step=False, on_epoch=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self(x)
-        #val_loss = F.mse_loss(y_hat, y)
-        val_loss = self.loss_fn(y_hat, y)
-        val_mape = torch.mean(torch.abs((y_hat - y) / y)) * 100
-        self.val_loss_epoch.append(val_loss.item())
-        self.val_mape_epoch.append(val_mape.item())
-        self.log('val_losses', val_loss, on_step=False, on_epoch=True)
-        self.log('val_mapes', val_mape, on_step=False, on_epoch=True)
-        return val_loss
-        
-    def on_train_epoch_end(self):
-        # Calculate and store the average training loss for the epoch
-        avg_train_loss = np.mean(self.train_loss_epoch)
-        self.train_losses.append(avg_train_loss)
-        self.train_loss_epoch = []  # Reset for the next epoch
-
-    def on_validation_epoch_end(self):
-        # Calculate and store the average validation loss for the epoch
-        avg_val_loss = np.mean(self.val_loss_epoch)
-        self.val_losses.append(avg_val_loss)
-        self.val_loss_epoch = []  # Reset for the next epoch
-        
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        return optimizer
 
 class MyProgressBar(TQDMProgressBar):
     def __init__(self, refresh_rate=10, leave = True):
@@ -555,6 +469,11 @@ def make_data_pretrain_ready (pretrain_data: pd.DataFrame, traffic_cols):
     # from the perspective of the traffic_cols columns  
     print('pretrain_data, before removing rows that dont have traffic ', pretrain_data.shape)
     pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+
+    #pretrain_data_traffic = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+    #pretrain_data_quiet = pretrain_data[pretrain_data[traffic_cols].isna().all(axis=1)].sample(n=pretrain_data_traffic.shape[0], random_state=561)
+    #pretrain_data = pd.concat([pretrain_data_traffic, pretrain_data_quiet], axis=0, ignore_index=True)
+    
     print('pretrain_data, after removing rows that dont have traffic ', pretrain_data.shape)
     
     return pretrain_data
@@ -720,6 +639,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
                         f"Invalid pretrain_model_to_load_type: {type}.")
     if type == 's3l_dae':
         hypp = s3l_hyp_ssl_dae
+        print('HYPERPARAMETERS: ', hypp)
         config = DAEConfig (input_dim=input_dim,
                        hidden_dim=hypp['hidden_dim'], encoder_depth=hypp['encoder_depth'], 
                        noise_type = hypp['noise_type'], noise_ratio = hypp['noise_ratio'], 
@@ -730,6 +650,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         model = DAELightning(config)
     elif type == 's3l_vime':
         hypp = s3l_hyp_ssl_vime
+        print('HYPERPARAMETERS: ', hypp)
         config = VIMEConfig(task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
                             input_dim=input_dim, hidden_dim=hypp['hidden_dim'], output_dim=1, 
                             encoder_depth = hypp['encoder_depth'], dropout_rate = hypp['dropout_rate'],
@@ -739,6 +660,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         model = VIMELightning(config)
     elif type == 's3l_scarf':
         hypp = s3l_hyp_ssl_scarf
+        print('HYPERPARAMETERS: ', hypp)
         config = SCARFConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={},
                              input_dim=input_dim, hidden_dim=hypp['hidden_dim'],
                              output_dim=1, encoder_depth=hypp['encoder_depth'], head_depth=hypp['head_depth'],
@@ -746,6 +668,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         model = SCARFLightning(config)
     elif type == 's3l_subtab':
         hypp = s3l_hyp_ssl_subtab
+        print('HYPERPARAMETERS: ', hypp)
         config = SubTabConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
                               input_dim=input_dim, hidden_dim=hypp['hidden_dim'], 
                               output_dim=1, tau=hypp['tau'], use_cosine_similarity=hypp['use_cosine_similarity'], use_contrastive=hypp['use_contrastive'], 
@@ -754,6 +677,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         model = SubTabLightning(config)
     elif type == 's3l_switchtab':
         hypp = s3l_hyp_ssl_switchtab
+        print('HYPERPARAMETERS: ', hypp)
         config = SwitchTabConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
                                      input_dim=input_dim, hidden_dim=hypp['hidden_dim'], output_dim=1, 
                                      encoder_depth=hypp['encoder_depth'], n_head = hypp['n_head'], u_label = hypp['u_label'])
@@ -844,7 +768,7 @@ def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, 
                                 train_collate_fn=SwitchTabFirstPhaseCollateFN(), valid_collate_fn=SwitchTabFirstPhaseCollateFN(), n_jobs = 5)
     
     checkpoint_callback = get_checkpoint(save_path)
-    trainer = Trainer(logger=False, ccelerator = 'gpu', max_epochs = hypp['max_epochs'], 
+    trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
@@ -1368,214 +1292,3 @@ def train_model (X_train, X_val, y_train, y_val, sup_model_type, learning_task_t
         print('Do not know model')
 
     return model 
-
-
-#==========================================
-# Plotting functions
-#==========================================
-
-def plot_model_train_info (train_losses, val_losses):
-    plt.figure(1)
-    plt.plot(train_losses)
-    plt.plot(val_losses)
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'])
-    plt.show()
-    #plt.savefig(model_save_path + 'loss_curve_' + '.pdf')
-
-    return True
-
-def plot_y_yhat (y_train,yhat_train,y_test,yhat_test, model_save_path):
-    plt.figure(3, figsize=(35, 5))
-    plt.plot(yhat_train, label='prediction')
-    plt.plot(y_train, label='ground truth')
-    plt.plot(y_train-yhat_train, label='error (truth-pred)')
-    plt.axhline(y=0, color='red', linestyle='--')
-    plt.title('Train samples')
-    plt.ylabel('UL delay (ms)')
-    plt.xlabel('Samples')
-    plt.ylim(-100, 100)
-    plt.legend()
-    plt.show()
-    #plt.savefig(model_save_path + 'train_y_yhat'
-    #             + '.pdf')
-    
-    plt.figure(4, figsize=(35, 5))
-    plt.plot(yhat_test, label='prediction')
-    plt.plot(y_test, label='ground truth')
-    plt.plot(y_test-yhat_test, label='error (truth-pred)')
-    plt.axhline(y=0, color='red', linestyle='--')
-    plt.title('Test samples')
-    plt.ylabel('UL delay (ms)')
-    plt.xlabel('Samples')
-    plt.ylim(-100, 100)
-    plt.legend()
-    plt.show()
-    #plt.savefig(model_save_path + 'test_y_yhat'
-    #             + '.pdf')
-    
-    return True
-
-def plot_heatmap(windowed_combined_data, plot_name):
-    plt.rcParams["figure.autolayout"] = True
-    corr_data = windowed_combined_data.corr(method='spearman')
-    fig = plt.figure(figsize=(11,11))
-    mask = np.triu(np.ones_like(corr_data, dtype=bool))
-    mask = mask[1:, :-1]
-    corr = corr_data.iloc[1:,:-1].copy()
-    hmap = sns.heatmap(corr, vmin=-1, cmap='coolwarm', annot=True, mask=mask, 
-                       vmax=1, annot_kws={"fontsize":15}, linecolor='black')
-    fig = hmap.get_figure()
-    plt.yticks(rotation=45)
-    fig.autofmt_xdate(rotation=45)
-    #plt.savefig(plot_name)
-    fig.show()
-
-def tabnet_explain(model, X, feat_filter, X_feats):
-    # Global explainability : feat importance summing to 1
-    print('Global explainability')
-    importances = model.feature_importances_
-    plot_feature_importance(importances, X_feats, feat_filter)
-    
-    # Local explainability and masks
-    print('Local explainability')
-    explain_matrix, masks = model.explain(X)
-    print('Explainability Matrix')
-    print(explain_matrix)
-    fig, axs = plt.subplots(1, 3, figsize=(20,20))
-    for i in range(3):
-        axs[i].imshow(masks[i][:50])
-        axs[i].set_title(f"mask {i}")
-    return
-
-def xgb_explain(model, feat_filter, X_feats):
-    # The length of importances reflects the number of features used
-    importances = model.feature_importances_
-    plot_feature_importance(importances, X_feats, feat_filter)
-    return
-
-def plot_feature_importance(importances, X_feats, feat_filter):
-    # increasing order in value and hence decreasing order in importance 
-    # sort the importances and then fetch the index value of those importances 
-    indices = np.argsort(importances)
-    #This is in ascending order of 
-    bar_vals = importances[np.flip(indices)[0:feat_filter]]
-    bar_names = X_feats[np.flip(indices)[0:feat_filter]]
-    #print(importances[np.flip(indices)[0:feat_filter]])
-    #print(X_feats[np.flip(indices)[0:feat_filter]])
-
-    #top_n_features = list( set(top_n_features).union(set(bar_names)))
-    #print('Top n feature list: ', top_n_features)
-    plt.figure(figsize=(7, 4))
-    plt.barh(range(len(bar_vals)), np.flip(bar_vals), color='b', align='center')
-    plt.yticks(range(len(bar_vals)), np.flip(bar_names))
-
-    plt.title('Feature importance')
-    plt.xlabel('Relative Importance')
-    #plt.savefig('plots_for_paper/feat_imp'+'.pdf', bbox_inches='tight')
-    plt.show() 
-    return
-
-def draw_confusion_matrix(true, pred, title):                
-    cm = confusion_matrix(true, pred, normalize='true')
-    # Create a confusion matrix plot
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt=".2f", cmap="Blues", cbar=True, xticklabels=np.unique(true), yticklabels=np.unique(pred))
-    # Add labels and title
-    plt.xlabel('Predicted Labels')
-    plt.ylabel('True Labels')
-    plt.title(title)
-    # Show the plot
-    plt.show()
-
-# Function to set up each subplot for the Q-Q plots
-def setup_axes(ax, x, y, title, color, bounds):
-    ax.plot(x, y, color, marker='.', linestyle='none')
-    ax.set_title(title)
-    ax.set_xlabel('Ground truth')
-    ax.set_ylabel('Predictions')
-    ax.set_xlim(bounds)
-    ax.set_ylim(bounds)
-    ax.plot(bounds, bounds, 'k-')  # Diagonal line
-    ax.set_aspect('equal', adjustable='box')
-    ax.grid(True)
-    # Set ticks at fixed intervals (modify interval as needed)
-    tick_locator = MaxNLocator(nbins=5)  # Adjust number of bins as needed
-    ax.xaxis.set_major_locator(tick_locator)
-    ax.yaxis.set_major_locator(tick_locator)
-    #ax.set_xticklabels([])
-    #ax.set_yticklabels([])
-    ax.set_xticklabels(ax.get_xticks().round(3), fontsize=14)
-    ax.set_yticklabels(ax.get_yticks().round(3), fontsize=14)
-    return
-
-# Plot hist of output
-def plot_hist_of_y(y_train, y_test, learning_task):
-    # If classification it will just bin it
-    fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(15, 4))
-    fig.subplots_adjust(top=0.85, bottom=0.20)
-    fig.supxlabel(learning_task)
-    fig.suptitle('Histogram')
-    ax1.hist(y_train, bins=50, color='r', edgecolor='k', label='train samples')
-    #ax1.set_xlabel(learning_task)
-    ax1.set_yticks([])
-    ax1.set_title('Train')
-    ax2.hist(y_test, bins=50, color='b', edgecolor='k', label='test_samples')
-    
-    ax2.set_yticks([])
-    ax2.set_title('Test')
-    plt.show()
-
-#=============================================
-# DANN 
-#=============================================
-
-# Define the domain classifier with a gradient reversal layer
-def gradient_reversal(x):
-    return -x
-
-# Define loss functions
-def custom_regression_loss(y_true, y_pred):
-    # Define your regression loss function here (e.g., mean squared error)
-    return K.mean(K.square(y_true - y_pred))
-
-def domain_adversarial_loss(y_true, y_pred):
-    # Binary cross-entropy loss for domain classification
-    return K.mean(K.binary_crossentropy(y_true, y_pred))
-
-
-def dann(input_dim, X_train, y_train_regression, domain_labels):
-    # Define the input shape
-    input_shape = (input_dim,)
-
-    # Define the feature extractor shared by the regressor and domain classifier
-    input_layer = Input(shape=input_shape)
-    shared_feature_extractor = Dense(64, activation='relu')(input_layer)  # Adjust the architecture as needed
-
-    # Define the regressor for the regression task
-    regressor = Dense(1, activation='linear')(shared_feature_extractor)  # Linear activation for regression
-
-    domain_classifier = Dense(1, activation='sigmoid')(Lambda(gradient_reversal)(shared_feature_extractor))
-
-    # Create the DANN model
-    dann_model = Model(inputs=input_layer, outputs=[regressor, domain_classifier])
-
-    # Compile the model
-    dann_model.compile(
-        optimizer=Adam(lr=IN_PARAM['learning_rate']),
-        loss={'regressor': custom_regression_loss, 'domain_classifier': domain_adversarial_loss},
-        loss_weights={'regressor': 1.0, 'domain_classifier': 1.0}  # Adjust the weights as needed
-    )
-
-    # Train the model
-    dann_model.fit(
-        x_train,
-        {'regressor': y_train_regression, 'domain_classifier': domain_labels},  # domain_labels are 0 for source, 1 for target
-        epochs=IN_PARAM['epochs'],
-        batch_size=IN_PARAM['batch_size']
-    )
-
-    # Make predictions using the regressor
-    predictions = dann_model.predict(x_test)[0]  # Index 0 corresponds to the regressor output
