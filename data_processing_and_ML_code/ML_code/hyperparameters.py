@@ -57,7 +57,7 @@ s3l_hyp_ssl_dae={
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
     
-    'encoder_depth': 2, #  
+    'encoder_depth': 4, #  
     'head_depth': 2, #
     'dropout_rate': 0.1, #
     
@@ -75,7 +75,7 @@ s3l_hyp_ssl_scarf={
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
     
-    'encoder_depth': 2,
+    'encoder_depth': 4,
     'head_depth': 2,
     'dropout_rate': 0.1, #
     
@@ -92,7 +92,7 @@ s3l_hyp_ssl_vime={
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
-    'encoder_depth': 2, #  
+    'encoder_depth': 4, #  
     # NO HEAD DEPTH
     'dropout_rate': 0.1, #
     
@@ -139,7 +139,7 @@ s3l_hyp_ssl_switchtab={
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
     
-    'encoder_depth': 1, # here the number does not indicate num of layers but number fo blocks 
+    'encoder_depth': 2, # here the number does not indicate num of layers but number fo blocks 
     # NO HEAD DEPTH
     'corruption_rate': 0.3,
     'dropout_rate': 0.1, #

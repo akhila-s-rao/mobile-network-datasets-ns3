@@ -4,20 +4,24 @@
 
 from helper_functions import *
 
-def plot_model_train_info (train_losses, val_losses):
+def plot_model_train_info (train_losses, val_losses, save_path=None):
+    font_size = 25
     plt.figure(1)
+    plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
     plt.plot(train_losses)
     plt.plot(val_losses)
     #plt.title('model loss')
-    plt.ylabel('Loss')
-    plt.xlabel('Epoch')
-    plt.legend(['Train', 'Val'])
+    plt.ylabel('Loss', fontsize=font_size)
+    plt.xlabel('Epoch', fontsize=font_size)
+    plt.legend(['Train', 'Val'], fontsize=22)
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
     plt.show()
-    #plt.savefig(model_save_path + 'loss_curve_' + '.pdf')
+    
 
     return True
 
-def plot_y_yhat (y_train,yhat_train,y_test,yhat_test, model_save_path):
+def plot_y_yhat (y_train,yhat_train,y_test,yhat_test, save_path):
     plt.figure(3, figsize=(35, 5))
     plt.plot(yhat_train, label='prediction')
     plt.plot(y_train, label='ground truth')
@@ -28,10 +32,10 @@ def plot_y_yhat (y_train,yhat_train,y_test,yhat_test, model_save_path):
     plt.xlabel('Samples')
     plt.ylim(-100, 100)
     plt.legend()
+    if save_path:
+        plt.savefig(save_path + '_train'+'.pdf')    
     plt.show()
-    #plt.savefig(model_save_path + 'train_y_yhat'
-    #             + '.pdf')
-    
+  
     plt.figure(4, figsize=(35, 5))
     plt.plot(yhat_test, label='prediction')
     plt.plot(y_test, label='ground truth')
@@ -42,9 +46,9 @@ def plot_y_yhat (y_train,yhat_train,y_test,yhat_test, model_save_path):
     plt.xlabel('Samples')
     plt.ylim(-100, 100)
     plt.legend()
+    if save_path:
+        plt.savefig(save_path + '_test'+'.pdf')
     plt.show()
-    #plt.savefig(model_save_path + 'test_y_yhat'
-    #             + '.pdf')
     
     return True
 
@@ -123,9 +127,9 @@ def draw_confusion_matrix(true, pred, title):
 # Function to set up each subplot for the Q-Q plots
 def setup_axes(ax, x, y, title, color, bounds):
     ax.plot(x, y, color, marker='.', linestyle='none')
-    ax.set_title(title)
-    ax.set_xlabel('Ground truth')
-    ax.set_ylabel('Predictions')
+    #ax.set_title(title, fontsize=16)
+    ax.set_xlabel('Ground truth', fontsize=20)
+    ax.set_ylabel('Predictions', fontsize=20)
     ax.set_xlim(bounds)
     ax.set_ylim(bounds)
     ax.plot(bounds, bounds, 'k-')  # Diagonal line
@@ -137,8 +141,8 @@ def setup_axes(ax, x, y, title, color, bounds):
     ax.yaxis.set_major_locator(tick_locator)
     #ax.set_xticklabels([])
     #ax.set_yticklabels([])
-    ax.set_xticklabels(ax.get_xticks().round(3), fontsize=14)
-    ax.set_yticklabels(ax.get_yticks().round(3), fontsize=14)
+    ax.set_xticklabels(ax.get_xticks().round(3), fontsize=20)
+    ax.set_yticklabels(ax.get_yticks().round(3), fontsize=20)
     return
 
 # Plot hist of output

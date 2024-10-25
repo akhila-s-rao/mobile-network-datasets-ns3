@@ -46,7 +46,8 @@ class DAE(TS3LModule):
         #    OrderedDict([
         #        ("head_activation", nn.ReLU(inplace=True)),
         #        ("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
-        #        ("head_dropout", nn.Dropout(dropout_rate)),
+        #        ("head_dropout", nn.Dropout(dropout_rate)),bbc
+        
         #        ("head_linear", nn.Linear(hidden_dim, output_dim))
         #    ])
         #)

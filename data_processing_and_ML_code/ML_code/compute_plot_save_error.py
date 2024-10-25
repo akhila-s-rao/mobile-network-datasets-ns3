@@ -1,6 +1,6 @@
 from helper_functions import *
 
-def compute_plot_save_error(y_train, yhat_train, y_test, yhat_test, learning_task, learning_task_type, rs, train_results, test_results):
+def compute_plot_save_error(y_train, yhat_train, y_test, yhat_test, learning_task, learning_task_type, rs, train_results, test_results, plot_save_path):
     
     if learning_task_type == 'reg':
         if np.isnan(yhat_train).any():
@@ -19,7 +19,7 @@ def compute_plot_save_error(y_train, yhat_train, y_test, yhat_test, learning_tas
 
         # Predicted versus ground-truth plots
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
-        fig.suptitle(learning_task, fontsize=16)
+        #fig.suptitle(learning_task, fontsize=16)
         y = np.concatenate((y_train, y_test))
         yhat = np.concatenate((yhat_train, yhat_test))
         bounds=[min( min(y),min(yhat) ), max( max(y),max(yhat) )]        
@@ -27,6 +27,8 @@ def compute_plot_save_error(y_train, yhat_train, y_test, yhat_test, learning_tas
         setup_axes(axes[0], y_train, yhat_train, 'Train', COLOUR_HEX[0], bounds)  # Adjust color as needed
         setup_axes(axes[1], y_test, yhat_test, 'Test', COLOUR_HEX[1], bounds)  # Adjust color as needed
         #plt.tight_layout()
+        if plot_save_path:
+            plt.savefig(plot_save_path) 
         plt.show()
     else: # clas
         if np.isnan(yhat_train).any():

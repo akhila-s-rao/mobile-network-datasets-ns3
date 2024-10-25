@@ -192,6 +192,7 @@ def s3l_training(pretrain, use_pretrained_model,
         print('DONE SAVING PRETRAINED MODEL')
         print(ModelSummary(pretrain_model, max_depth=-1))
         
+        
         # If I just pretrained then I am done here 
         # Come back with pretrain set to false to do second phase training
         print('Time to pretrain model: ', time.time() - start_time)
@@ -519,7 +520,7 @@ def s3l_training(pretrain, use_pretrained_model,
                     #==========================
                     # INITIALIZE
                     #==========================
-                    assert (sup_model_type in ['xgb', 'mlp'], 
+                    assert (sup_model_type in ['xgb', 'mlp'],
                             f"Invalid sup_model_type: {sup_model_type}.")
                     
                     val_scaler = create_format_specific_scaler(X_train, categorical_cols, EXP_PARAM['scaler'])
@@ -601,11 +602,12 @@ def s3l_training(pretrain, use_pretrained_model,
                 #===============================================================
                 # COMPUTE ERROR AFTER TRAINING WITH LABELED DATA  
                 #===============================================================
+                plot_save_path='plots/q-q_'+pt_type+'_T'+str(idx+1)+'_rand'+str(rs)+'_'+str(label_no)+'.pdf'
                 train_results, test_results = compute_plot_save_error(y_train, yhat_train, 
                                                                       y_test, yhat_test, 
                                                                       learning_task, learning_task_type, 
                                                                       rs, 
-                                                                      train_results, test_results)
+                                                                      train_results, test_results, plot_save_path)
                 print('\n===============================  DONE with this learning task  ===================================================')
                 # end of for each learning task 
             

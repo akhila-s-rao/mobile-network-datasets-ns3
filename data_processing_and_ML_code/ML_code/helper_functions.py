@@ -745,7 +745,8 @@ def s3l_pretrain_with_subtab(X_unlabeled, continuous_cols, categorical_cols, hyp
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
-    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+    plt_str='loss_curve_subtab.pdf'
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
 
     return pl_module, trainer
 
@@ -771,7 +772,8 @@ def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, 
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
-    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+    plt_str='loss_curve_switchtab.pdf'
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
 
     return pl_module, trainer
 
@@ -798,7 +800,8 @@ def s3l_pretrain_with_scarf(X_unlabeled, continuous_cols, categorical_cols, hypp
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
-    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+    plt_str='loss_curve_scarf.pdf'
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
 
     return pl_module, trainer
 
@@ -824,7 +827,8 @@ def s3l_pretrain_with_vime(X_unlabeled, continuous_cols, categorical_cols, hypp,
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
-    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+    plt_str='loss_curve_vime.pdf'
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
     
     return pl_module, trainer
 
@@ -854,7 +858,8 @@ def s3l_pretrain_with_dae(X_unlabeled, continuous_cols, categorical_cols, hypp, 
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
                       callbacks=[MyProgressBar(), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
-    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss)
+    plt_str='loss_curve_dae.pdf'
+    plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
 
     return pl_module, trainer
 
@@ -1283,7 +1288,8 @@ def train_model (X_train, X_val, y_train, y_val, sup_model_type, learning_task_t
     
     if sup_model_type == 'mlp': 
         model, history = get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
-        plot_model_train_info (history['train_losses'], history['val_losses'])
+        plt_str='loss_curve_switchtab.pdf'
+        plot_model_train_info (history['train_losses'], history['val_losses'], 'plots/'+plt_str)
     elif sup_model_type == 'xgb':
         model, history = get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
     elif sup_model_type == 'tabnet':
