@@ -14,8 +14,8 @@ class VIME(TS3LModule):
                 hidden_dim: int, 
                 output_dim: int,
                 encoder_depth=4,
-                #head_depth=2,
-                dropout_rate = 0.04
+                head_depth=2,
+                dropout_rate = 0.1
                 ):
         """Initialize VIME
 
@@ -26,12 +26,9 @@ class VIME(TS3LModule):
         """
         super(VIME, self).__init__()
         # Akhila added this 
-        # VIMESelfSupervised in the original did not accept the input parameter hidden_dim
-        #self.__encoder = VIMESelfSupervised(input_dim)
-        self.__encoder = VIMESelfSupervised(input_dim, hidden_dim, encoder_depth, dropout_rate)
-        #self.predictor = VIMESemiSupervised(input_dim, hidden_dim, output_dim)
-        self.one_layer_prediction_head = VIMESemiSupervised_1(input_dim, hidden_dim, output_dim)
-        self.two_layer_prediction_head = VIMESemiSupervised_2(input_dim, hidden_dim, output_dim)
+        self.__encoder = VIMESelfSupervised(input_dim, hidden_dim, encoder_depth, head_depth, dropout_rate, batchnorm=False)
+        self.one_layer_prediction_head = VIMESemiSupervised_1(hidden_dim, output_dim)
+        self.two_layer_prediction_head = VIMESemiSupervised_2(hidden_dim, output_dim)
         
     @property
     def encoder(self) -> nn.Module:
@@ -64,14 +61,11 @@ class VIME(TS3LModule):
         x = x.squeeze(1)
         #print(x.shape)
         
-        x = self.encoder.encoder(x)
+        emb = torch.relu(self.encoder.encoder(x))
         
         if self.pred_head_size == 1:
-            logits = self.one_layer_prediction_head(x)
-            #print('using 1 layer head')
+            logits = self.one_layer_prediction_head(emb)
         else:
-            logits = self.two_layer_prediction_head(x)
-            #print('using 2 layer head')
+            logits = self.two_layer_prediction_head(emb)
         
-        #logits = self.predictor(x)
         return logits

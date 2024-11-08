@@ -103,8 +103,14 @@ def second_phase_loss(
         Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: The losses for the given task and consistency regularization and the ground truth labels
     """
 
-    task_loss = task_loss_fn(y_hat, y)
-
+    if y_hat.shape[0] == 0:
+        task_loss = torch.tensor(0.0, device=y.device)     
+    else: 
+        task_loss = task_loss_fn(y_hat, y)
+    #print('task_loss: ', task_loss, ' y_hat.shape: ', y_hat.shape)
+    
+    
+    
     if len(unlabeled_y_hat) == 0:
         return task_loss, torch.tensor(0.0, device=y.device)
 
@@ -121,4 +127,7 @@ def second_phase_loss(
 
     consistency_loss = consistency_loss_fn(preds, target)
 
+    #print('consistency_loss: ', consistency_loss, ' unlabeled_y_hat.shape: ' , unlabeled_y_hat.shape , ' preds.shape: ', preds.shape)
+    #print(y_hat.shape, unlabeled_y_hat.shape, preds.shape)
+    
     return task_loss, consistency_loss

@@ -17,7 +17,7 @@ class DAE(TS3LModule):
         hidden_dim,
         encoder_depth=4,
         head_depth=2,
-        dropout_rate = 0.04,
+        dropout_rate = 0.1,
         output_dim = 2,
     ):
         """Implementation of Denoising AutoEncoder.
@@ -33,32 +33,17 @@ class DAE(TS3LModule):
             output_dim (int, 2): The size of the outputs
         """
         super(DAE, self).__init__()
-
-        # Akhila added this to disable batchnorm. I need to make this settable from the Config Later.  
-        batchnorm = False
         
-        self.__encoder = MLP(input_dim, hidden_dim, encoder_depth, dropout_rate, batchnorm)
-        self.mask_predictor_head = MLP(hidden_dim, input_dim, head_depth, dropout_rate, batchnorm)
-        self.reconstruction_head = MLP(hidden_dim, input_dim, head_depth, dropout_rate, batchnorm)
-
-        # Original
-        #self.head = nn.Sequential(
-        #    OrderedDict([
-        #        ("head_activation", nn.ReLU(inplace=True)),
-        #        ("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
-        #        ("head_dropout", nn.Dropout(dropout_rate)),bbc
-        
-        #        ("head_linear", nn.Linear(hidden_dim, output_dim))
-        #    ])
-        #)
+        self.__encoder = MLP(input_dim, hidden_dim, hidden_dim, encoder_depth, dropout_rate, batchnorm=False)
+        # No batchnorm or dropout for these part
+        self.mask_predictor_head = MLP(hidden_dim, hidden_dim, input_dim, head_depth, dropout=0.0, batchnorm=False)
+        self.reconstruction_head = MLP(hidden_dim, hidden_dim, input_dim, head_depth, dropout=0.0, batchnorm=False)
         
         # Akhila # single hidden layer in head
         self.one_layer_prediction_head = nn.Sequential(
             OrderedDict([
                 ("head_linear_hid", nn.Linear(hidden_dim, hidden_dim)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(0.1)),
                 ("head_linear_out", nn.Linear(hidden_dim, output_dim))
             ])
         )
@@ -67,13 +52,9 @@ class DAE(TS3LModule):
         self.two_layer_prediction_head = nn.Sequential(
             OrderedDict([
                 ("head_linear_hid1", nn.Linear(hidden_dim, hidden_dim)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation1", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(dropout_rate)),
                 ("head_linear_hid2", nn.Linear(hidden_dim, 100)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation2", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(dropout_rate)),
                 ("head_linear_out", nn.Linear(100, output_dim))
             ])
         )
@@ -83,7 +64,7 @@ class DAE(TS3LModule):
         return self.__encoder
 
     def _first_phase_step(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        emb = self.encoder(x)
+        emb = torch.relu(self.encoder(x))
         mask = torch.sigmoid(self.mask_predictor_head(emb))
         feature = self.reconstruction_head(emb)
 
@@ -91,13 +72,10 @@ class DAE(TS3LModule):
 
     # Akhila
     def _second_phase_step(self, x: torch.Tensor) -> torch.Tensor:
-        emb = self.encoder(x)
+        emb = torch.relu(self.encoder(x))
 
         if self.pred_head_size == 1:
-            output = self.one_layer_prediction_head(emb)
-            
+            output = self.one_layer_prediction_head(emb)           
         else:
-            output = self.two_layer_prediction_head(emb)
-            
-            #output = self.head(emb)
+            output = self.two_layer_prediction_head(emb)            
         return output

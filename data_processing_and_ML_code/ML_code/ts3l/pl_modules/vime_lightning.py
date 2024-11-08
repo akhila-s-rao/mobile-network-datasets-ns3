@@ -93,6 +93,7 @@ class VIMELightning(TS3LLightining):
             torch.Tensor: The predicted label of the labeled data
         """
         _, y = batch
+        #print('shape of X from batch', batch[0].shape)
         
         y_hat = F.vime.second_phase_step(self.model, batch)
         
@@ -105,7 +106,6 @@ class VIMELightning(TS3LLightining):
         unlabeled_y_hat = y_hat[unlabeled_idx]
         
         task_loss, consistency_loss = F.vime.second_phase_loss(labeled_y, labeled_y_hat, unlabeled_y_hat, self.consistency_loss_fn, self.task_loss_fn, self.K)
-        
         loss = task_loss + self.beta * consistency_loss
         
         return loss, labeled_y, labeled_y_hat

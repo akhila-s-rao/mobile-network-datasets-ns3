@@ -11,7 +11,9 @@ class VIMESelfSupervised(nn.Module):
     def __init__(self, input_dim:int, 
                  hidden_dim:int,
                  encoder_depth=4,
-                 dropout_rate = 0.04):
+                 head_depth=2,
+                 dropout_rate = 0.04,
+                 batchnorm=False):
     
         """Initialize self-supervised module of VIME
 
@@ -20,31 +22,17 @@ class VIMESelfSupervised(nn.Module):
         """
         super().__init__()
         
-        batchnorm = False
         # Original
         #self.h = nn.Linear(input_dim, input_dim, bias=True)
         #self.mask_output = nn.Linear(input_dim, input_dim, bias=True)
         #self.feature_output = nn.Linear(input_dim, input_dim, bias=True)        
         
         # Akhila has increased the encoder_depth
-        self.encoder = MLP(input_dim, hidden_dim, encoder_depth, dropout_rate, batchnorm)
-
-        #layers = []
-        #in_dim = input_dim
+        self.encoder = MLP(input_dim, hidden_dim, hidden_dim, encoder_depth, dropout_rate, batchnorm=False)
+        # No batchnorm or dropout for these part
+        self.mask_output = MLP(hidden_dim, hidden_dim, input_dim, head_depth, dropout=0.0, batchnorm=False)
+        self.feature_output = MLP(hidden_dim, hidden_dim, input_dim, head_depth, dropout=0.0, batchnorm=False)
         
-        #for i in range(encoder_depth - 1):
-        #    layers.append(torch.nn.Linear(in_dim, hidden_dim))
-        #    layers.append(nn.BatchNorm1d(hidden_dim))
-        #    layers.append(nn.ReLU(inplace=True))
-        #    layers.append(torch.nn.Dropout(dropout))
-        #    in_dim = hidden_dim
-        #layers.append(torch.nn.Linear(hidden_dim, hidden_dim))
-
-        
-        self.mask_output = nn.Linear(hidden_dim, input_dim, bias=True)
-        self.feature_output = nn.Linear(hidden_dim, input_dim, bias=True) 
-        
-
 
     def forward(self, x):
         """The forward pass of self-supervised module of VIME
@@ -56,10 +44,8 @@ class VIMESelfSupervised(nn.Module):
             torch.FloatTensor: The predicted mask vector of VIME
             torch.FloatTensor: The predicted features of VIME
         """
-        # original
-        #h = torch.relu(self.h(x))
         # Akhila
-        h = self.encoder(x)
+        h = torch.relu(self.encoder(x))
         mask = torch.sigmoid(self.mask_output(h))
-        feature = torch.sigmoid(self.feature_output(h))
+        feature = self.feature_output(h)
         return mask, feature

@@ -18,6 +18,7 @@ from pytorch_mlp import *
 def s3l_training(pretrain, use_pretrained_model, 
                  pred_head_type = 'ts3l',# 'ts3l', 'xgb'
                  pt_type='',
+                 unlab_dataset_scenario = 'pd1', # 'pd1' - 'pd4'
                  sup_model_type = '',
                  # Baseline
                  random_initialize_model=False,
@@ -54,12 +55,12 @@ def s3l_training(pretrain, use_pretrained_model,
     test_slice = 'all' #['macro', 'micro', 'slow', 'fast', 'all']
     EXP_PARAM = {
         'scaler': 'standard', #'minmax', 'standard', 'robust', 'maxabs', 'l2norm'
-        'num_rand_runs': 3 # number of runs with each run doing a different random sample of size label_no from the set of labeled samples 
+        'num_rand_runs': 1 # number of runs with each run doing a different random sample of size label_no from the set of labeled samples 
     }
     
     #num_samples_list = [100, 1*K, 10*K, 20*K]
-    num_samples_list = [100, 250, 500, 1*K, 10*K, 20*K]
-    #num_samples_list = [10*K]
+    #num_samples_list = [100, 250, 500, 1*K, 10*K, 20*K]
+    num_samples_list = [1000, 20*K]
     
     #==================================
     # Pretraining Experiment Parameters
@@ -123,15 +124,15 @@ def s3l_training(pretrain, use_pretrained_model,
     clip_outliers = True
     delay_clip_th = 5000 # ms
     
-    num_train_runs = 7 # 7 
-    num_test_runs = 3 # 3
-    train_test_run_nums = np.array(range(11, 20+1))
-    #num_train_runs = 1 # 7 
-    #num_test_runs = 1 # 3
-    #train_test_run_nums = np.array(range(11, 12+1))
+    #num_train_runs = 7 # 7 
+    #num_test_runs = 3 # 3
+    #train_test_run_nums = np.array(range(11, 20+1))
+    num_train_runs = 1 # 7 
+    num_test_runs = 1 # 3
+    train_test_run_nums = np.array(range(11, 12+1))
     
-    pretrain_runs = range(1, 10 + 1)
-    #pretrain_runs = range(1, 1 + 1)
+    #pretrain_runs = range(1, 10 + 1)
+    pretrain_runs = range(1, 1 + 1)
     
     # Create the pretrain_models_folder if it does not already exist
     if not os.path.isdir(pretrain_models_folder):
@@ -149,38 +150,22 @@ def s3l_training(pretrain, use_pretrained_model,
                                                   shift_samp_for_predict, 
                                                   impute_method, sum_cols_substr, all_learning_tasks_in_data)
         
-        # Remove the rows that do not represent an instance where there is traffic in the network
-        # This basically translates to removing rows which have no non NaN learning_task values
-        # Results in 33K samples
-        #traffic_cols = list(set(learning_tasks) - {'delay_trace.txt_ul_delay', 
-        #              'delay_trace.txt_dl_delay'})
-        # Results in 102K samples 
-        #traffic_cols = list(set(all_learning_tasks_in_data) - {'delay_trace.txt_ul_delay', 
-        #              'delay_trace.txt_dl_delay'})
-        traffic_cols = pretrain_data.columns # keep all rows 
-        pretrain_data = make_data_pretrain_ready (pretrain_data, traffic_cols)
+        X_pretrain = make_data_pretrain_ready (pretrain_data, learning_tasks, all_learning_tasks_in_data, unlab_dataset_scenario)
         
-        # Remove the labels of all prediction tasks which are also in the dataset 
-        X_pretrain = pretrain_data.drop(all_learning_tasks_in_data, axis=1, errors='ignore')
-        # Drop rows that have NaNs 
-        X_pretrain = X_pretrain.dropna()
         X_cols = X_pretrain.columns
-        
-        #continuous_cols, categorical_cols = get_cont_and_cat_cols(X_pretrain)
         continuous_cols = list(set(X_cols) - set(categorical_cols))
-        
-        print('X_pretrain ', X_pretrain.shape)
-        # Create, save and use scaler
+    
+        # Create a scaler and save it
         # X_pretrain should be a pandas dataframe 
         val_scaler = create_format_specific_scaler(X_pretrain, categorical_cols, EXP_PARAM['scaler'])
         with open(pretrain_models_folder + scaler_to_save_name +'.pkl', 'wb') as f:
             pickle.dump(val_scaler, f)
         
         # transform returns a numpy even when you pass a pandas dataframe 
-        X_pretrain = val_scaler.transform(X_pretrain).copy()
-        X_pretrain = pd.DataFrame(X_pretrain, columns=X_cols)
+        X_pretrain = pd.DataFrame(val_scaler.transform(X_pretrain).copy(), columns=X_cols)
+        
         # Is this needed ? # Check 
-        X_pretrain[categorical_cols] = X_pretrain[categorical_cols].astype(int)
+        #X_pretrain[categorical_cols] = X_pretrain[categorical_cols].astype(int)
     
         # Pretrain
         start_time = time.time()
@@ -235,6 +220,26 @@ def s3l_training(pretrain, use_pretrained_model,
     open(train_results_filepath, 'w').close()
     open(test_results_filepath, 'w').close()
 
+    # VIME needs unlabeled data for it's semi supervised learning in SP
+    if pretrain_model_to_load_type == 's3l_vime':
+        # Read the pretraining data
+        pretrain_data = read_and_concatenate_runs(pretrain_runs, dataset_folder, 
+                                                  pretrain_slice, network_info, time_step_size, 
+                                                  use_all_feats, drop_col_substr, learning_tasks, 
+                                                  shift_samp_for_predict, 
+                                                  impute_method, sum_cols_substr, all_learning_tasks_in_data)
+        
+        X_pretrain = make_data_pretrain_ready (pretrain_data, learning_tasks, all_learning_tasks_in_data, unlab_dataset_scenario)
+        X_cols = X_pretrain.columns        
+        # Load the saved Scaler object from the file
+        with open(pretrain_models_folder + scaler_to_load_name, 'rb') as f:
+            val_scaler = pickle.load(f)
+        # Transform
+        X_pretrain = pd.DataFrame(val_scaler.transform(X_pretrain).copy(), columns=X_cols)
+    else:
+        X_pretrain = None
+        
+    
     # =================================================
     # LOOP OVER DIFFERENT NUMBER OF LABELED SAMPLES
     # =================================================
@@ -376,17 +381,19 @@ def s3l_training(pretrain, use_pretrained_model,
                     # transform returns numpy. I need to convert back to pandas dataframe becasue the Ts3l library needs it in this format 
                     X_train = pd.DataFrame(X_train, columns=X_feats)
                     X_val = pd.DataFrame(X_val, columns=X_feats)
-                    X_test = pd.DataFrame(X_test, columns=X_feats)                        
+                    X_test = pd.DataFrame(X_test, columns=X_feats)                                                
                     
                     # I am setting batch size based on the number of samples in the train set 
                     if EXP_PARAM['label_no'] <= 5000:
-                        s3l_hyp_pred_head['batch_size'] = 10
-                        sup_hyper_params=hypp_sup_xgb_small
+                        s3l_hyp_pred_head['batch_size'] = 10 
+                        sup_hyper_params=hypp_sup_xgb_small    
+                            
                     else: # when it is greater
-                        s3l_hyp_pred_head['batch_size'] = 50
+                        s3l_hyp_pred_head['batch_size'] = 200
                         sup_hyper_params=hypp_sup_xgb_large
-
-                    print('Setting batch_size to ', s3l_hyp_pred_head['batch_size'])
+                        
+                    if pretrain_model_to_load_type == 's3l_vime':
+                            s3l_hyp_pred_head['batch_size'] = 2000 
 
                     if use_pretrained_model: 
                         # load the model
@@ -411,7 +418,8 @@ def s3l_training(pretrain, use_pretrained_model,
                                         X_val, y_val,
                                         X_test,
                                         is_regression, continuous_cols=continuous_cols, category_cols=categorical_cols, 
-                                        batch_size = s3l_hyp_pred_head['batch_size'])
+                                        batch_size = s3l_hyp_pred_head['batch_size'],
+                                        X_pretrain=X_pretrain)
                     
                     
                     #============================
@@ -470,26 +478,26 @@ def s3l_training(pretrain, use_pretrained_model,
                     elif pred_head_type == 'ts3l':
                         
                         # prepare a trainer 
+                        best_ckpt_save_path = suptrain_models_folder+suptrain_model_to_save_name
+                        model_checkpoint = get_best_r2_checkpoint(best_ckpt_save_path)
+                        print(best_ckpt_save_path)
                         sup_trainer = Trainer(logger=False, accelerator = 'gpu',
                                               max_epochs = s3l_hyp_pred_head['max_epochs'], 
-                                              #early_stopping, model_checkpoint
                                               enable_progress_bar=True,
-                                              callbacks=[MyProgressBar()]
-                                              #default_root_dir=suptrain_models_folder+suptrain_model_to_save_name
+                                              callbacks=[MyProgressBar(), model_checkpoint]
                                              )
                         # Train
                         sup_trainer.fit(ssl_model, datamodule)
-                        # Load the best model 
-                        #best_model_path = model_checkpoint.best_model_path
-                        #print(f"Best model path: {best_model_path}")
-                        #ssl_model = DAELightning.load_from_checkpoint(best_model_path)
-
-                        # Get train and validation loss and metric
-                        #plot_model_train_info (train_losses, val_losses):
-                        #ssl_model.second_phase_train_loss
-                        #ssl_model.second_phase_val_loss
-                        #ssl_model.second_phase_val_metric
+                        # Plot the validation metric 
+                        plot_model_val_info(ssl_model.second_phase_val_metric)
                         
+                        # Load the best model 
+                        print(f"Best model path: {model_checkpoint.best_model_path}")
+                        best_ssl_model = s3l_load(model_checkpoint.best_model_path, pretrain_model_to_load_type)
+                        # Set the best model loaded from checkpoint to second phase
+                        best_ssl_model.set_second_phase(freeze_encoder=freeze_encoder, pred_head_size=pred_head_size)
+                        ssl_model = best_ssl_model
+                        print('Loading best r2 score checkpoint')
 
                         if learning_task_type == 'reg':
                             yhat_test = sup_trainer.predict(ssl_model, test_dl)

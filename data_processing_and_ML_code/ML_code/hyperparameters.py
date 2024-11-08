@@ -38,7 +38,7 @@ hypp_sup_mlp={
 s3l_hyp_pred_head={
     # I am setting this in code directly since I want to use different batch sizes for different sample siezes
     'batch_size': None,
-    'max_epochs': 30,
+    'max_epochs': 1, # 30
     'patience': 5,
     'loss':{'reg': 'MSELoss', #'L1Loss',
             'clas':'CrossEntropyLoss'},
@@ -93,7 +93,7 @@ s3l_hyp_ssl_vime={
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
     'encoder_depth': 4, #  
-    # NO HEAD DEPTH
+    'head_depth': 2,
     'dropout_rate': 0.1, #
     
     'p_m': 0.3, # Corruption probability for self-supervised learning
@@ -101,7 +101,7 @@ s3l_hyp_ssl_vime={
     'alpha1': 2.0, # Hyper-parameter to control the weights of feature and mask losses
     'alpha2': 2.0, # Hyper-parameter to control the weights of feature and mask losses
     'K': 3, # Number of augmented samples
-    'beta': 1.0 # Hyperparameter to control supervised and unsupervised losses
+    'beta': 0.2 # Hyperparameter to control supervised and unsupervised losses
 }
 
 s3l_hyp_ssl_subtab={

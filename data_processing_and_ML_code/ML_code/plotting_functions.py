@@ -3,6 +3,7 @@
 #==========================================
 
 from helper_functions import *
+from matplotlib.ticker import FormatStrFormatter
 
 def plot_model_train_info (train_losses, val_losses, save_path=None):
     font_size = 25
@@ -17,7 +18,20 @@ def plot_model_train_info (train_losses, val_losses, save_path=None):
     if save_path:
         plt.savefig(save_path, bbox_inches='tight')
     plt.show()
-    
+
+    return True
+
+def plot_model_val_info (val_losses, save_path=None):
+    font_size = 25
+    plt.figure(1)
+    plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+    plt.plot(val_losses)
+    plt.ylim(-1, 1)
+    plt.ylabel(r'Val $R^2$ score', fontsize=font_size)
+    plt.xlabel('Epoch', fontsize=font_size)
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+    plt.show()
 
     return True
 

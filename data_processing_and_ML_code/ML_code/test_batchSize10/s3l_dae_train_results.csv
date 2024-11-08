@@ -1,0 +1,5 @@
+vrFragment_trace.txt_vr_frag_thput_mbps,0.145,1.075,0.788
+vrFragment_trace.txt_vr_burst_thput_mbps,4.262,0.548,0.859
+vrFragment_trace.txt_vr_frag_time,38.799,0.935,0.808
+vrFragment_trace.txt_vr_burst_time,35.009,0.771,0.821
+delay_trace.txt_dl_delay,4.958,0.475,0.812

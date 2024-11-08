@@ -464,20 +464,37 @@ def get_cont_and_cat_cols(df):
     return continuous_cols, categorical_cols
 
 
-def make_data_pretrain_ready (pretrain_data: pd.DataFrame, traffic_cols):
-    # Drop the rows that do not represent an instance where there is traffic in the network 
-    # from the perspective of the traffic_cols columns  
-    print('pretrain_data, before removing rows that dont have traffic ', pretrain_data.shape)
-    pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+def make_data_pretrain_ready (pretrain_data: pd.DataFrame, learning_tasks, all_learning_tasks_in_data, unlab_dataset_scenario='pd1'):
 
-    #pretrain_data_traffic = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
-    #pretrain_data_quiet = pretrain_data[pretrain_data[traffic_cols].isna().all(axis=1)].sample(n=pretrain_data_traffic.shape[0], random_state=561)
-    #pretrain_data = pd.concat([pretrain_data_traffic, pretrain_data_quiet], axis=0, ignore_index=True)
-    
+    print('pretrain_data, before removing rows that dont have traffic ', pretrain_data.shape)
+
+    if unlab_dataset_scenario == 'pd1':
+        # Results in 1.8 M samples
+        traffic_cols = pretrain_data.columns
+        pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+    elif unlab_dataset_scenario == 'pd2':
+        # Results in 33K samples
+        traffic_cols = list(set(learning_tasks) - {'delay_trace.txt_ul_delay', 'delay_trace.txt_dl_delay'})
+        pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+    elif unlab_dataset_scenario == 'pd3':   
+        # Results in 102K samples 
+        traffic_cols = list(set(all_learning_tasks_in_data) - {'delay_trace.txt_ul_delay', 'delay_trace.txt_dl_delay'})
+        pretrain_data = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+    elif unlab_dataset_scenario == 'pd4':
+        traffic_cols = list(set(all_learning_tasks_in_data) - {'delay_trace.txt_ul_delay', 'delay_trace.txt_dl_delay'}) 
+        pretrain_data_traffic = pretrain_data.dropna(subset=traffic_cols, how='all', axis=0)
+        pretrain_data_quiet = pretrain_data[pretrain_data[traffic_cols].isna().all(axis=1)].sample(n=pretrain_data_traffic.shape[0], random_state=561)
+        pretrain_data = pd.concat([pretrain_data_traffic, pretrain_data_quiet], axis=0, ignore_index=True)
+
     print('pretrain_data, after removing rows that dont have traffic ', pretrain_data.shape)
     
-    return pretrain_data
+    # Remove the labels of all prediction tasks which are also in the dataset 
+    X_pretrain = pretrain_data.drop(all_learning_tasks_in_data, axis=1, errors='ignore')
+    # Drop rows that have NaNs 
+    X_pretrain = X_pretrain.dropna()
+    print('X_pretrain ', X_pretrain.shape)
     
+    return X_pretrain # pandas
 
 def make_data_sup_model_ready(data, learning_task, learning_task_type, all_learning_tasks_in_data, bitrate_levels, clip_outliers, delay_clip_th):
     # Prepare the train and test sets and drop rows which dont have ground truth 
@@ -688,6 +705,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
 #========================================
 # Pretraining functions
 #========================================
+# Used during first phase pretraining
 def get_checkpoint (save_path):
     checkpoint_callback = ModelCheckpoint(
                         monitor='val_loss',                # Monitor validation loss
@@ -700,8 +718,22 @@ def get_checkpoint (save_path):
     )
     return checkpoint_callback
 
+# Used during second phase finetuning
+def get_best_r2_checkpoint (save_path):
+    checkpoint_callback = ModelCheckpoint(
+            monitor='val_r2_score',        # Monitors validation r2 score 
+            dirpath=save_path,    # Directory to save checkpoints
+            filename='{epoch}-best-r2-{val_r2_score:.3f}', # Checkpoint filename
+            save_top_k=1,              # Only save the best model
+            mode='max',                 # Maximize the validation r2 score
+            enable_version_counter = False # Whether to append a version to the existing file name.
+    )
+    return checkpoint_callback
+
+
 def early_stopping(patience):
     early_stopping = EarlyStopping(monitor='val_loss', patience=15, verbose=False, mode='min')
+    
     return early_stopping
 
 
@@ -929,11 +961,13 @@ def s3l_load(load_path, type):
     
 
 def prepare_dataloaders(pretrain_model_to_load_type, 
-                                        X_train, y_train,
-                                        X_val, y_val,
-                                        X_test,
-                                        is_regression, continuous_cols, category_cols, 
-                                        batch_size):
+                        X_train, y_train,
+                        X_val, y_val,
+                        X_test,
+                        is_regression, continuous_cols, category_cols, 
+                        batch_size,
+                        X_pretrain = None):
+    
     if pretrain_model_to_load_type == 's3l_dae':
     
         train_ds = DAEDataset(X = X_train, Y = y_train, is_regression=is_regression,
@@ -954,10 +988,16 @@ def prepare_dataloaders(pretrain_model_to_load_type,
     
     elif pretrain_model_to_load_type == 's3l_vime':
         
-        train_ds = VIMEDataset(X = X_train, Y = y_train, is_regression=is_regression,
-                               continuous_cols=continuous_cols, category_cols=categorical_cols, 
-                               is_second_phase=True)
-        valid_ds = VIMEDataset(X = X_val, Y = y_val, is_regression=is_regression,
+        hypp=s3l_hyp_ssl_vime
+        config = VIMEConfig( task="regression", input_dim=X_train.shape[1], output_dim=1, loss_fn=hypp['loss_fn'],
+                            alpha1=hypp['alpha1'], alpha2=hypp['alpha2'], 
+                            beta=hypp['beta'], K=hypp['K'], p_m = hypp['p_m'], num_categoricals=1) # num_categoricals wont be used here anyway so I dont care what I send 
+        
+        train_ds = VIMEDataset(X = X_train, Y = y_train, 
+                               config=config, 
+                               unlabeled_data=X_pretrain, 
+                               is_regression=is_regression, continuous_cols=continuous_cols, category_cols=categorical_cols, is_second_phase=True)
+        valid_ds = VIMEDataset(X = X_val, Y = y_val, config=config, is_regression=is_regression,
                                continuous_cols=continuous_cols, category_cols=categorical_cols, 
                                is_second_phase=True)   
         datamodule = TS3LDataModule(train_ds, valid_ds, batch_size = s3l_hyp_pred_head['batch_size'], is_regression=is_regression,

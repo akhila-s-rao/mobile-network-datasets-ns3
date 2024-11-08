@@ -16,7 +16,7 @@ class SCARF(TS3LModule):
         output_dim,
         encoder_depth=4,
         head_depth=2,
-        dropout_rate = 0.04,
+        dropout_rate = 0.1,
     ) -> None:
         """Implementation of SCARF: Self-Supervised Contrastive Learning using Random Feature Corruption.
         It consists in an encoder that learns the embeddings.
@@ -31,31 +31,16 @@ class SCARF(TS3LModule):
                 dropout_rate (float, optional): A hyperparameter that is to control dropout layer. Default is 0.04.
         """
         super(SCARF, self).__init__()
-
-        # Akhila added this to disable batchnorm. I need to make this settable from the Config Later.  
-        batchnorm = False
         
-        self.__encoder = MLP(input_dim, hidden_dim, encoder_depth, batchnorm)
-
-        self.pretraining_head = MLP(hidden_dim, hidden_dim, head_depth, batchnorm)
-
-        # Original
-        #self.head = nn.Sequential(
-        #    OrderedDict([
-        #        ("head_activation", nn.ReLU(inplace=True)),
-        #        ("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
-        #        ("head_dropout", nn.Dropout(dropout_rate)),
-        #        ("head_linear", nn.Linear(hidden_dim, output_dim))
-        #    ])
-        #)
+        self.__encoder = MLP(input_dim, hidden_dim, hidden_dim, encoder_depth, dropout_rate, batchnorm=False)
+        # No batchnorm or dropout for these part
+        self.pretraining_head = MLP(hidden_dim, hidden_dim, hidden_dim, head_depth, dropout=0.0, batchnorm=False)
         
         # Akhila # single hidden layer in head
         self.one_layer_prediction_head = nn.Sequential(
             OrderedDict([
                 ("head_linear_hid", nn.Linear(hidden_dim, hidden_dim)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(0.1)),
                 ("head_linear_out", nn.Linear(hidden_dim, output_dim))
             ])
         )
@@ -64,13 +49,9 @@ class SCARF(TS3LModule):
         self.two_layer_prediction_head = nn.Sequential(
             OrderedDict([
                 ("head_linear_hid1", nn.Linear(hidden_dim, hidden_dim)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation1", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(dropout_rate)),
                 ("head_linear_hid2", nn.Linear(hidden_dim, 100)),
-                #("head_batchnorm", nn.BatchNorm1d(hidden_dim)),
                 ("head_activation2", nn.ReLU(inplace=True)),
-                #("head_dropout", nn.Dropout(dropout_rate)),
                 ("head_linear_out", nn.Linear(100, output_dim))
             ])
         )
@@ -81,26 +62,22 @@ class SCARF(TS3LModule):
         
     def _first_phase_step(self, x: torch.Tensor, x_corrupted: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
-        emb_anchor = self.encoder(x)
+        emb_anchor = torch.relu(self.encoder(x))
         emb_anchor = self.pretraining_head(emb_anchor)
-
         emb_anchor = F.normalize(emb_anchor, p=2)
         
-        emb_corrupted = self.__encoder(x_corrupted)
+        emb_corrupted = torch.relu(self.__encoder(x_corrupted))
         emb_corrupted = self.pretraining_head(emb_corrupted)
         emb_corrupted = F.normalize(emb_corrupted, p=2)
 
         return emb_anchor, emb_corrupted
     
     def _second_phase_step(self, x) -> torch.Tensor:
-        emb = self.encoder(x)
+        emb = torch.relu(self.encoder(x))
+        
         if self.pred_head_size == 1:
             output = self.one_layer_prediction_head(emb)
-            #print('using 1 layer head')
         else:
             output = self.two_layer_prediction_head(emb)
-            #print('using 2 layer head')
-        
-        #output = self.head(emb)
         
         return output
