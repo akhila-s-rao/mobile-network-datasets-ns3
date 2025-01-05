@@ -6,7 +6,7 @@ from pytorch_lightning import LightningDataModule
 class TS3LDataModule(LightningDataModule):
     """The pytorch lightning datamodule for TabularS3L
     """
-    def __init__(self, train_ds:Dataset, val_ds:Dataset, batch_size: int, train_sampler: str, train_collate_fn = None, valid_collate_fn = None, n_jobs: int = 32, drop_last: bool = False, is_regression:bool = False):
+    def __init__(self, train_ds:Dataset, val_ds:Dataset, batch_size: int, train_sampler: str, train_collate_fn = None, valid_collate_fn = None, n_jobs: int = 5, drop_last: bool = False, is_regression:bool = False):
         """Initialize the datamodule
 
         Args:
@@ -35,6 +35,7 @@ class TS3LDataModule(LightningDataModule):
         self.n_jobs = n_jobs
         self.is_regression = is_regression
         self.drop_last = drop_last
+        print('NUMBER OF JOBS: ', self.n_jobs)
 
     def setup(self, stage: str):
         """Setup the datamodule for pytorch lightning module of TabularS3L.
@@ -48,7 +49,7 @@ class TS3LDataModule(LightningDataModule):
             sampler = SequentialSampler(self.train_ds) # type: ignore
             shuffle = True
         elif self.train_sampler == "weighted":
-            sampler = WeightedRandomSampler(self.train_ds.weights, num_samples = len(self.train_ds)) # type: ignore
+            samppin_memoryler = WeightedRandomSampler(self.train_ds.weights, num_samples = len(self.train_ds)) # type: ignore
             shuffle = False
         elif self.train_sampler == "random":
             sampler = RandomSampler(self.train_ds, num_samples = len(self.train_ds)) # type: ignore
@@ -59,15 +60,23 @@ class TS3LDataModule(LightningDataModule):
                                     shuffle=shuffle, 
                                     sampler = sampler,
                                     num_workers=self.n_jobs,
+                                    #num_workers=32,
                                     drop_last=self.drop_last,
-                                    collate_fn = self.train_collate_fn)
+                                    collate_fn = self.train_collate_fn,
+                                    pin_memory=False,
+                                    persistent_workers=True
+                                  )
         self.val_dl = DataLoader(self.val_ds, 
                                 batch_size = self.batch_size, 
                                 shuffle=False, 
                                 sampler = SequentialSampler(self.val_ds), # type: ignore
                                 num_workers=self.n_jobs, 
+                                #num_workers=32,
                                 drop_last=False, 
-                                collate_fn=self.valid_collate_fn)
+                                collate_fn=self.valid_collate_fn,
+                                pin_memory=False,
+                                persistent_workers=True
+                                )
     
     def train_dataloader(self):
         """Return the training dataloader.

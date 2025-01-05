@@ -5,6 +5,8 @@
 from helper_functions import *
 from matplotlib.ticker import FormatStrFormatter
 
+color_palate2 = ['#377eb8', '#ff7f00', '#4daf4a', '#f781bf', '#a65628', '#984ea3', '#999999', '#e41a1c', '#dede00'] 
+
 def plot_model_train_info (train_losses, val_losses, save_path=None):
     font_size = 25
     plt.figure(1)
@@ -25,8 +27,9 @@ def plot_model_val_info (val_losses, save_path=None):
     font_size = 25
     plt.figure(1)
     plt.gca().yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-    plt.plot(val_losses)
-    plt.ylim(-1, 1)
+    plt.plot(val_losses, linewidth=3)
+    plt.ylim(-0.5, 1)
+    plt.grid()
     plt.ylabel(r'Val $R^2$ score', fontsize=font_size)
     plt.xlabel('Epoch', fontsize=font_size)
     if save_path:
@@ -166,11 +169,11 @@ def plot_hist_of_y(y_train, y_test, learning_task):
     fig.subplots_adjust(top=0.85, bottom=0.20)
     fig.supxlabel(learning_task)
     fig.suptitle('Histogram')
-    ax1.hist(y_train, bins=50, color='r', edgecolor='k', label='train samples')
+    ax1.hist(y_train, bins=50, color=color_palate2[0], edgecolor='k', label='train samples')
     #ax1.set_xlabel(learning_task)
     ax1.set_yticks([])
     ax1.set_title('Train')
-    ax2.hist(y_test, bins=50, color='b', edgecolor='k', label='test_samples')
+    ax2.hist(y_test, bins=50, color=color_palate2[1], edgecolor='k', label='test_samples')
     
     ax2.set_yticks([])
     ax2.set_title('Test')

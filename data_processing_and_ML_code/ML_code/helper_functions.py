@@ -16,11 +16,12 @@ from tensorflow.keras.metrics import F1Score
 from tensorflow.keras.callbacks import LambdaCallback
 
 import tensorflow as tf
-import tensorflow.keras.backend as K
 
 from keras.layers import Input, Dense, Lambda, BatchNormalization, Dropout, ReLU
 
-#from sklearn.preprocessing import MinMaxScaler
+from scipy.stats import skew, kurtosis
+
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import MaxAbsScaler
@@ -84,6 +85,7 @@ from pytorch_tabnet.tab_model import TabNetClassifier, TabNetRegressor
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
+from pytorch_lightning.callbacks.progress import ProgressBar
 from pytorch_lightning import Trainer
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
@@ -92,6 +94,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from torchmetrics.regression import R2Score
 
+from torchmetrics import R2Score
 # TS3L library
 from ts3l.utils import TS3LDataModule
 
@@ -120,12 +123,14 @@ from ts3l.utils.switchtab_utils import SwitchTabConfig
 
 from hyperparameters import *
 from plotting_functions import *
+from pytorch_mlp import *
 
 plt.rcParams.update({'font.size': 22})
 
 M = (10**6)
 K = (10**3)
 
+RAND_SEED = None
 
 plt.rcParams.update({'font.size': 22})
 
@@ -206,8 +211,20 @@ class MAPELoss(nn.Module):
         loss = torch.mean(torch.abs((y_true - y_pred) / (y_true + epsilon)) * 100)
         return loss
 
+class SimpleProgressBar(ProgressBar):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if (batch_idx + 1) % 10 == 0:  # Print progress every 50 batches
+            print(f"Batch {batch_idx + 1}/{len(trainer.train_dataloader)}")
+            
+class LoggingProgressBar(TQDMProgressBar):
+    def __init__(self, refresh_rate=10):
+        super().__init__()
+        self._refresh_rate = refresh_rate
 
-
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if (batch_idx + 1) % self._refresh_rate == 0:
+            print(f"Epoch {trainer.current_epoch}, Batch {batch_idx + 1}/{len(trainer.train_dataloader())}")
+            
 class MyProgressBar(TQDMProgressBar):
     def __init__(self, refresh_rate=10, leave = True):
         super().__init__()
@@ -250,6 +267,9 @@ def initialize(r=None):
     else:
         print("No GPU found.")
     print(torch.cuda.device_count())
+    # set it globally so it can be accessed everywhere
+    RAND_SEED = r
+    print('RAND_SEED: ', RAND_SEED)
 
 # Function to format arrays in DataFrame cells to 3 significant digits
 def format_array(arr):
@@ -266,6 +286,20 @@ def create_nan_array(size):
     return[float('nan')] * size
     #return np.full(size, np.nan)
 
+def scale_summarize_array(arr):
+    # Reshape array for MinMaxScaler
+    arr = arr.reshape(-1, 1)
+    scaler = MinMaxScaler(feature_range=(-1, 1))  # Default range is [0, 1]
+    arr = scaler.fit_transform(arr)
+    print(f"Min: {np.min(arr)}")
+    print(f"Max: {np.max(arr)}")
+    print(f"Mean: {np.mean(arr)}")
+    print(f"Median: {np.median(arr)}")
+    print(f"Skewness: {skew(arr)}")
+    print(f"Kurtosis: {kurtosis(arr)}")
+    # Flatten the result if needed
+    arr = arr.flatten()
+    
 #=============================================
 # Data Manipulation Functions
 #=============================================
@@ -318,6 +352,65 @@ def nextWindow_shift(df, tasks):
     df[tasks] = df[tasks].shift(periods=1)
     return df 
 
+# Read the dataset
+def read_all_runs(runs, dataset_folder, slice, network_info, time_step_size, use_all_feats, drop_col_substr, 
+                              learning_tasks, shift_samp_for_predict, impute_method, sum_cols_substr, all_learning_tasks_in_data):
+    
+    start_time = time.time()
+    data_dict = {} 
+
+    for run in runs:
+        csv_read_start_time = time.time()
+        this_run_data = pd.read_csv(dataset_folder+'run'+str(run)+'_dataslice_all_webpage_video_delay_vr_'+time_step_size+'.csv', delimiter=",")
+        print('Time to read csv file for run: ', time.time() - csv_read_start_time)
+        # separate the rows that belong to the desired data slice
+        this_run_data = data_slice_filter_samples(slice, this_run_data, network_info)
+        # Drop columns that we do not want to include in the dataset
+        if use_all_feats:
+            # Dropping unwanted columns 
+            cols_to_drop = [data_col for data_col in this_run_data.columns if any(drop_substr in data_col for drop_substr in drop_col_substr)]
+            this_run_data = this_run_data.drop(cols_to_drop, axis=1, errors='ignore')
+        else:
+            this_run_data = this_run_data[top_n_agg]
+
+        # Dropping columns that are only nans
+        this_run_data = this_run_data.drop(this_run_data.columns[this_run_data.isna().all(axis=0)], axis=1, errors='ignore')
+        # Impute the X part of the data
+        x_cols = list(set(this_run_data.columns) - set(all_learning_tasks_in_data))
+        this_run_data_imputed = this_run_data.groupby(by=['IMSI']).apply(lambda group: impute_data(group, x_cols, impute_method, sum_cols_substr)).droplevel(level='IMSI') 
+        # Shift the learning_task parts 
+        if shift_samp_for_predict:
+            this_run_data_imputed = this_run_data_imputed.groupby(by=['IMSI']).apply(lambda group: nextWindow_shift(group, all_learning_tasks_in_data)).droplevel(level='IMSI')
+
+        # drop IMSI and wind_tstamp column since I don't need it to groupby anymore
+        this_run_data_imputed = this_run_data_imputed.drop(['IMSI', 'wind_tstamp'],axis=1)
+        this_run_data_imputed = add_cell_type_as_feature(this_run_data_imputed, network_info)
+        # indices dont matter once I concatenate data from multiple runs 
+        this_run_data_imputed = this_run_data_imputed.reset_index(drop=True)
+        
+        # concatenate over runs
+        data_dict[run] = this_run_data_imputed 
+        print('Loaded run', str(run))
+    print('Time to read all runs: ', time.time() - start_time)
+
+    return data_dict
+
+
+# Read the dataset
+def concatenate_runs(concat_runs, data_dict):
+    start_time = time.time()
+    data = pd.DataFrame()
+    print('Concatenating runs: ', concat_runs)
+    for run in concat_runs: 
+        # concatenate over runs
+        data = pd.concat([data, data_dict[run]], axis=0) 
+        print('Concatenated run', str(run))
+    # Always remember to reset index after concatenating runs because each run has it's own index
+    data = data.reset_index(drop=True)
+    print('Time to concatenate all runs: ', time.time() - start_time)
+
+    return data
+    
 
 # Read the dataset
 def read_and_concatenate_runs(concat_runs, dataset_folder, slice, network_info, time_step_size, use_all_feats, drop_col_substr, 
@@ -510,11 +603,13 @@ def make_data_sup_model_ready(data, learning_task, learning_task_type, all_learn
     y = data_na_dropped[learning_task]
     X = data_na_dropped.drop(all_learning_tasks_in_data, axis=1, errors='ignore')
 
+    print('After separating X and y:', X.shape, y.shape)
     # If the beginning of the dataset has nans and we are using ffill then there might still be nans in the data 
     # so drop any additional rows with nans that have remained because of this
     X = X.dropna()
     # Do the same for y as well                 
     y = y.loc[X.index]
+    print('After removing NaNs that are at the beginning of runs: ', X.shape, y.shape)
 
     if (learning_task in ['delay_trace.txt_ul_delay', 'delay_trace.txt_dl_delay']) and clip_outliers:
         print('NOTE: clipping all rows with delay values > ', delay_clip_th)
@@ -650,7 +745,7 @@ def compute_error(truth, pred, err_type):
 #========================================
 # TS3L random initialize function
 #========================================
-def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_cols):
+def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_cols, encoder_depth, hidden_dim):
     
     assert (type in ['s3l_dae', 's3l_vime', 's3l_scarf', 's3l_subtab', 's3l_switchtab'], 
                         f"Invalid pretrain_model_to_load_type: {type}.")
@@ -658,7 +753,7 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         hypp = s3l_hyp_ssl_dae
         print('HYPERPARAMETERS: ', hypp)
         config = DAEConfig (input_dim=input_dim,
-                       hidden_dim=hypp['hidden_dim'], encoder_depth=hypp['encoder_depth'], 
+                       hidden_dim=hidden_dim, encoder_depth=encoder_depth, 
                        noise_type = hypp['noise_type'], noise_ratio = hypp['noise_ratio'], 
                        num_categoricals=len(categorical_cols), num_continuous=len(continuous_cols),
                        # These are specific to tasks and not to pretraining
@@ -669,8 +764,8 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         hypp = s3l_hyp_ssl_vime
         print('HYPERPARAMETERS: ', hypp)
         config = VIMEConfig(task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
-                            input_dim=input_dim, hidden_dim=hypp['hidden_dim'], output_dim=1, 
-                            encoder_depth = hypp['encoder_depth'], dropout_rate = hypp['dropout_rate'],
+                            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=1, 
+                            encoder_depth = encoder_depth, dropout_rate = hypp['dropout_rate'],
                             alpha1=hypp['alpha1'], alpha2=hypp['alpha2'], 
                             beta=hypp['beta'], K=hypp['K'], p_m = hypp['p_m'],
                             num_categoricals=len(categorical_cols), num_continuous=len(continuous_cols))
@@ -679,15 +774,15 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         hypp = s3l_hyp_ssl_scarf
         print('HYPERPARAMETERS: ', hypp)
         config = SCARFConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={},
-                             input_dim=input_dim, hidden_dim=hypp['hidden_dim'],
-                             output_dim=1, encoder_depth=hypp['encoder_depth'], head_depth=hypp['head_depth'],
+                             input_dim=input_dim, hidden_dim=hidden_dim,
+                             output_dim=1, encoder_depth=encoder_depth, head_depth=hypp['head_depth'],
                              dropout_rate=hypp['dropout_rate'], corruption_rate = hypp['corruption_rate']) 
         model = SCARFLightning(config)
     elif type == 's3l_subtab':
         hypp = s3l_hyp_ssl_subtab
         print('HYPERPARAMETERS: ', hypp)
         config = SubTabConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
-                              input_dim=input_dim, hidden_dim=hypp['hidden_dim'], 
+                              input_dim=input_dim, hidden_dim=hidden_dim, 
                               output_dim=1, tau=hypp['tau'], use_cosine_similarity=hypp['use_cosine_similarity'], use_contrastive=hypp['use_contrastive'], 
                               use_distance=hypp['use_distance'], n_subsets=hypp['n_subsets'], overlap_ratio=hypp['overlap_ratio'],
                               mask_ratio=hypp['mask_ratio'], noise_type=hypp['noise_type'])
@@ -696,8 +791,8 @@ def initialize_s3l_model_random(type, input_dim, categorical_cols, continuous_co
         hypp = s3l_hyp_ssl_switchtab
         print('HYPERPARAMETERS: ', hypp)
         config = SwitchTabConfig( task="regression", loss_fn=hypp['loss_fn'], metric=hypp['metric'], metric_hparams={}, 
-                                     input_dim=input_dim, hidden_dim=hypp['hidden_dim'], output_dim=1, 
-                                     encoder_depth=hypp['encoder_depth'], n_head = hypp['n_head'], u_label = hypp['u_label'])
+                                     input_dim=input_dim, hidden_dim=hidden_dim, output_dim=1, 
+                                     encoder_depth=encoder_depth, n_head = hypp['n_head'], u_label = hypp['u_label'])
         model = SwitchTabLightning(config)
     return model
 
@@ -723,7 +818,7 @@ def get_best_r2_checkpoint (save_path):
     checkpoint_callback = ModelCheckpoint(
             monitor='val_r2_score',        # Monitors validation r2 score 
             dirpath=save_path,    # Directory to save checkpoints
-            filename='{epoch}-best-r2-{val_r2_score:.3f}', # Checkpoint filename
+            filename='{epoch}-best-val-R2', # Checkpoint filename
             save_top_k=1,              # Only save the best model
             mode='max',                 # Maximize the validation r2 score
             enable_version_counter = False # Whether to append a version to the existing file name.
@@ -763,19 +858,19 @@ def s3l_pretrain_with_subtab(X_unlabeled, continuous_cols, categorical_cols, hyp
 
     pl_module = SubTabLightning(config)
     # create a train and validation set 
-    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
-    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
+    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True, random_state=RAND_SEED)  
+    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True, random_state=RAND_SEED)
     
     ### First Phase Learning
     train_ds = SubTabDataset(X_train, unlabeled_data=X_unlabeled)
     valid_ds = SubTabDataset(X_valid)
     
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', 
-                                train_collate_fn=SubTabCollateFN(config), valid_collate_fn=SubTabCollateFN(config), n_jobs = 5)
+                                train_collate_fn=SubTabCollateFN(config), valid_collate_fn=SubTabCollateFN(config), n_jobs = hypp['n_jobs'])
     checkpoint_callback = get_checkpoint(save_path)
     
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
-                      callbacks=[MyProgressBar(), checkpoint_callback])
+                      callbacks=[MyProgressBar(refresh_rate=100), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plt_str='loss_curve_subtab.pdf'
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
@@ -791,18 +886,18 @@ def s3l_pretrain_with_switchtab(X_unlabeled, continuous_cols, categorical_cols, 
 
     pl_module = SwitchTabLightning(config)
     # create a train and validation set 
-    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
-    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
+    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True, random_state=RAND_SEED)  
+    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True, random_state=RAND_SEED)
     ### First Phase Learning
     train_ds = SwitchTabDataset(X = X_train, unlabeled_data = X_unlabeled, config=config, continuous_cols=continuous_cols, category_cols=categorical_cols)
     valid_ds = SwitchTabDataset(X = X_valid, config=config, continuous_cols=continuous_cols, category_cols=categorical_cols)
 
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', 
-                                train_collate_fn=SwitchTabFirstPhaseCollateFN(), valid_collate_fn=SwitchTabFirstPhaseCollateFN(), n_jobs = 5)
+                                train_collate_fn=SwitchTabFirstPhaseCollateFN(), valid_collate_fn=SwitchTabFirstPhaseCollateFN(), n_jobs = hypp['n_jobs'])
     
     checkpoint_callback = get_checkpoint(save_path)
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
-                      callbacks=[MyProgressBar(), checkpoint_callback])
+                      callbacks=[MyProgressBar(refresh_rate=100), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plt_str='loss_curve_switchtab.pdf'
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
@@ -820,17 +915,17 @@ def s3l_pretrain_with_scarf(X_unlabeled, continuous_cols, categorical_cols, hypp
     
     pl_module = SCARFLightning(config)
     # create a train and validation set 
-    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
-    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
+    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True, random_state=RAND_SEED)  
+    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True, random_state=RAND_SEED)
 
     ### First Phase Learning
     train_ds = SCARFDataset(X = X_train, unlabeled_data=X_unlabeled, config = config)
     valid_ds = SCARFDataset(X = X_valid, config=config)
     
-    datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = 5)
+    datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = hypp['n_jobs'])
     checkpoint_callback = get_checkpoint(save_path)
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
-                      callbacks=[MyProgressBar(), checkpoint_callback])
+                      callbacks=[MyProgressBar(refresh_rate=100), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plt_str='loss_curve_scarf.pdf'
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
@@ -849,15 +944,15 @@ def s3l_pretrain_with_vime(X_unlabeled, continuous_cols, categorical_cols, hypp,
     
     pl_module = VIMELightning(config)
     # create a train and validation set 
-    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
-    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
+    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True, random_state=RAND_SEED)  
+    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True, random_state=RAND_SEED)
     ### First Phase Learning
     train_ds = VIMEDataset(X = X_train, unlabeled_data = X_unlabeled, config=config, continuous_cols = continuous_cols, category_cols = categorical_cols)
     valid_ds = VIMEDataset(X = X_valid, config=config, continuous_cols = continuous_cols, category_cols = categorical_cols)
-    datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = 5)
+    datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', n_jobs = hypp['n_jobs'])
     checkpoint_callback = get_checkpoint(save_path)
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
-                      callbacks=[MyProgressBar(), checkpoint_callback])
+                      callbacks=[MyProgressBar(refresh_rate=100), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plt_str='loss_curve_vime.pdf'
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
@@ -880,15 +975,15 @@ def s3l_pretrain_with_dae(X_unlabeled, continuous_cols, categorical_cols, hypp, 
     pl_module = DAELightning(config)
     # Pretraining
     # create a train and validation set 
-    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True)  
-    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True)
+    X_unlabeled, X_train = train_test_split(X_unlabeled, test_size=0.05, shuffle=True, random_state=RAND_SEED)  
+    X_unlabeled, X_valid = train_test_split(X_unlabeled, test_size=0.1, shuffle=True, random_state=RAND_SEED)
     train_ds = DAEDataset(X = X_train, unlabeled_data = X_unlabeled, continuous_cols = continuous_cols, category_cols = categorical_cols)
     valid_ds = DAEDataset(X = X_valid, continuous_cols = continuous_cols, category_cols = categorical_cols)
     datamodule = TS3LDataModule(train_ds, valid_ds, hypp['batch_size'], train_sampler='random', 
-                                train_collate_fn=DAECollateFN(config), valid_collate_fn=DAECollateFN(config), n_jobs = 5) # made valid_ds None
+                                train_collate_fn=DAECollateFN(config), valid_collate_fn=DAECollateFN(config), n_jobs = hypp['n_jobs']) # made valid_ds None
     checkpoint_callback = get_checkpoint(save_path)
     trainer = Trainer(logger=False, accelerator = 'gpu', max_epochs = hypp['max_epochs'], 
-                      callbacks=[MyProgressBar(), checkpoint_callback])
+                      callbacks=[MyProgressBar(refresh_rate=100), checkpoint_callback])
     trainer.fit(pl_module, datamodule)
     plt_str='loss_curve_dae.pdf'
     plot_model_train_info (pl_module.first_phase_train_loss, pl_module.first_phase_val_loss, 'plots/'+plt_str)
@@ -969,26 +1064,30 @@ def prepare_dataloaders(pretrain_model_to_load_type,
                         X_pretrain = None):
     
     if pretrain_model_to_load_type == 's3l_dae':
-    
+
+        # Training
         train_ds = DAEDataset(X = X_train, Y = y_train, is_regression=is_regression,
                               continuous_cols=continuous_cols, category_cols=categorical_cols)
         valid_ds = DAEDataset(X = X_val, Y = y_val, is_regression=is_regression,
                               continuous_cols=continuous_cols, category_cols=categorical_cols)
         datamodule = TS3LDataModule(train_ds, valid_ds, is_regression=is_regression,
-                                    batch_size = s3l_hyp_pred_head['batch_size'], train_sampler="random")
+                                    batch_size = s3l_hyp_pred_head['batch_size'], train_sampler="random", n_jobs=s3l_hyp_ssl_dae['n_jobs'])
         # Evaluation
         test_ds = DAEDataset(X_test, category_cols=categorical_cols, 
                              continuous_cols=continuous_cols, is_regression=is_regression)
         test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=s3l_hyp_ssl_dae['n_jobs'],
+                            pin_memory=True, persistent_workers=True)
         train_ds = DAEDataset(X_train, continuous_cols=continuous_cols, 
                               category_cols=categorical_cols, is_regression=is_regression)
         train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=s3l_hyp_ssl_dae['n_jobs'], 
+                             pin_memory=True, persistent_workers=True)
     
     elif pretrain_model_to_load_type == 's3l_vime':
         
         hypp=s3l_hyp_ssl_vime
+        # Danger num_categoricals is hard-coded !
         config = VIMEConfig( task="regression", input_dim=X_train.shape[1], output_dim=1, loss_fn=hypp['loss_fn'],
                             alpha1=hypp['alpha1'], alpha2=hypp['alpha2'], 
                             beta=hypp['beta'], K=hypp['K'], p_m = hypp['p_m'], num_categoricals=1) # num_categoricals wont be used here anyway so I dont care what I send 
@@ -1001,30 +1100,34 @@ def prepare_dataloaders(pretrain_model_to_load_type,
                                continuous_cols=continuous_cols, category_cols=categorical_cols, 
                                is_second_phase=True)   
         datamodule = TS3LDataModule(train_ds, valid_ds, batch_size = s3l_hyp_pred_head['batch_size'], is_regression=is_regression,
-                                    train_sampler="random", train_collate_fn=VIMESecondPhaseCollateFN()) 
+                                    train_sampler="random", train_collate_fn=VIMESecondPhaseCollateFN(), n_jobs=s3l_hyp_ssl_vime['n_jobs']) 
         # Evaluation
         test_ds = VIMEDataset(X_test, category_cols=categorical_cols, is_regression=is_regression,
                              continuous_cols=continuous_cols, is_second_phase=True)
         test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=s3l_hyp_ssl_vime['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
         train_ds = VIMEDataset(X_train, continuous_cols=continuous_cols, is_regression=is_regression, 
                               category_cols=categorical_cols, is_second_phase=True)
         train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=s3l_hyp_ssl_vime['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
     
     elif pretrain_model_to_load_type == 's3l_scarf':
     
         train_ds = SCARFDataset(X_train, y_train, is_regression=is_regression, is_second_phase=True)
         valid_ds = SCARFDataset(X_val, y_val, is_regression=is_regression, is_second_phase=True)
         datamodule = TS3LDataModule(train_ds, valid_ds, batch_size = s3l_hyp_pred_head['batch_size'], is_regression=is_regression, 
-                                    train_sampler="random")
+                                    train_sampler="random", n_jobs=s3l_hyp_ssl_scarf['n_jobs'])
         # Evaluation
         test_ds = SCARFDataset(X_test, is_regression=is_regression, is_second_phase=True)
         test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=s3l_hyp_ssl_scarf['n_jobs'],
+                            pin_memory=True, persistent_workers=True)
         train_ds = SCARFDataset(X_train, is_regression=is_regression, is_second_phase=True)
         train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=s3l_hyp_ssl_scarf['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
     
     elif pretrain_model_to_load_type == 's3l_subtab':
         
@@ -1041,18 +1144,16 @@ def prepare_dataloaders(pretrain_model_to_load_type,
         valid_ds = SubTabDataset(X_val, y_val, is_regression=is_regression)
         datamodule = TS3LDataModule(train_ds, valid_ds, batch_size = s3l_hyp_pred_head['batch_size'], is_regression=is_regression, 
                                     train_sampler="random", train_collate_fn=SubTabCollateFN(config), 
-                                    valid_collate_fn=SubTabCollateFN(config))
+                                    valid_collate_fn=SubTabCollateFN(config), n_jobs=s3l_hyp_ssl_subtab['n_jobs'])
         # Evaluation
         test_ds = SubTabDataset(X_test, is_regression=is_regression)
         test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'], collate_fn=SubTabCollateFN(config),
-                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
-        #test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'],
-        #                     shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=s3l_hyp_ssl_subtab['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
         train_ds = SubTabDataset(X_train, is_regression=is_regression)
         train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'], collate_fn=SubTabCollateFN(config),
-                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
-        #train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'],
-        #                     shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=s3l_hyp_ssl_subtab['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
     
     elif pretrain_model_to_load_type == 's3l_switchtab':
      
@@ -1061,16 +1162,18 @@ def prepare_dataloaders(pretrain_model_to_load_type,
         valid_ds = SwitchTabDataset(X_val, y_val, continuous_cols=continuous_cols, category_cols=categorical_cols, 
                                     is_regression=is_regression, is_second_phase=True)
         datamodule = TS3LDataModule(train_ds, valid_ds, batch_size = s3l_hyp_pred_head['batch_size'], is_regression=is_regression, 
-                                    train_sampler="random")
+                                    train_sampler="random", n_jobs=s3l_hyp_ssl_switchtab['n_jobs'])
         # Evaluation
         test_ds = SwitchTabDataset(X_test, continuous_cols=continuous_cols, category_cols=categorical_cols, 
                                    is_regression=is_regression, is_second_phase=True)
         test_dl = DataLoader(test_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(test_ds), num_workers=s3l_hyp_ssl_switchtab['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
         train_ds = SwitchTabDataset(X_train, continuous_cols=continuous_cols, category_cols=categorical_cols, 
                                     is_regression=is_regression, is_second_phase=True)
         train_dl = DataLoader(train_ds, s3l_hyp_pred_head['batch_size'], 
-                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=4)
+                             shuffle=False, sampler = SequentialSampler(train_ds), num_workers=s3l_hyp_ssl_switchtab['n_jobs'],
+                             pin_memory=True, persistent_workers=True)
 
     return datamodule, train_dl, test_dl
 
@@ -1167,27 +1270,27 @@ def predict_from_dataloader(model: nn.Sequential, dataloader: DataLoader, model_
 def get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type):
     if learning_task_type == 'reg':
         if hyper_params['loss'][learning_task_type] == 'mae':
-            model = XGBRegressor(**params, n_jobs=30, 
+            model = XGBRegressor(**params, n_jobs=hyper_params['n_jobs'], 
                                  learning_rate=hyper_params['learning_rate'], # Set the learning rate (0.1 is a common default)
                                  n_estimators=hyper_params['n_estimators'], # Number of trees (adjust based on your data size)
                                  max_depth=hyper_params['max_depth'] # Max depth of trees (control model complexity)
                                 )
         elif hyper_params['loss'][learning_task_type] == 'mape':
-            model = XGBRegressor(n_jobs=30, objective=mape_obj,
+            model = XGBRegressor(n_jobs=hyper_params['n_jobs'], objective=mape_obj,
                                  learning_rate=hyper_params['learning_rate'], # Set the learning rate (0.1 is a common default)
                                  n_estimators=hyper_params['n_estimators'], # Number of trees (adjust based on your data size)
                                  max_depth=hyper_params['max_depth'] # Max depth of trees (control model complexity)
                                 )
                             #eval_metric=mean_absolute_percentage_error,
         else:# use the default which is mse
-            model = XGBRegressor(n_jobs=30,
+            model = XGBRegressor(n_jobs=hyper_params['n_jobs'],
                                  learning_rate=hyper_params['learning_rate'], # Set the learning rate (0.1 is a common default)
                                  n_estimators=hyper_params['n_estimators'], # Number of trees (adjust based on your data size)
                                  max_depth=hyper_params['max_depth'] # Max depth of trees (control model complexity)
                                 )
 
     else: #'clas'
-        model = XGBClassifier(n_jobs=30, use_label_encoder=False, 
+        model = XGBClassifier(n_jobs=hyper_params['n_jobs'], use_label_encoder=False, 
                               learning_rate=hyper_params['learning_rate'], # Set the learning rate (0.1 is a common default)
                               n_estimators=hyper_params['n_estimators'], # Number of trees (adjust based on your data size)
                               max_depth=hyper_params['max_depth'] # Max depth of trees (control model complexity)
@@ -1203,18 +1306,23 @@ def get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_para
 def get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type):    
     train_loader = DataLoader(TensorDataset(torch.tensor(X_train, dtype=torch.float32), 
                                             torch.tensor(y_train, dtype=torch.float32)), 
-                              batch_size=hyper_params['batch_size'], shuffle=True)
+                              batch_size=hyper_params['batch_size'], shuffle=True,
+                              pin_memory=True, persistent_workers=True, num_workers=5)
     val_loader = DataLoader(TensorDataset(torch.tensor(X_val, dtype=torch.float32), 
                                             torch.tensor(y_val, dtype=torch.float32)), 
-                              batch_size=hyper_params['batch_size'], shuffle=True)
+                              batch_size=hyper_params['batch_size'], shuffle=True,
+                              pin_memory=True, persistent_workers=True, num_workers=5)
     
     if learning_task_type == 'reg':
         # Model instantiation
-        print('Blue BLue You are bLue ')
         print('loss_fn_str: ', hyper_params['loss']['reg'])
+        
         model = MLPRegressor(input_dim=X_train.shape[1], 
-                             hidden_dims=hyper_params['fc_layers'], output_dim=1, 
-                             use_batchnorm=hyper_params['use_batchnorm'], use_dropout=hyper_params['use_dropout'], 
+                             hidden_dim=hyper_params['hidden_dim'],
+                             #hidden_dims=hyper_params['fc_layers'], 
+                             output_dim=1, 
+                             depth=hyper_params['depth'],
+                             use_batchnorm=hyper_params['use_batchnorm'], 
                              dropout_rate=hyper_params['dropout_rate'], 
                              learning_rate=hyper_params['learning_rate'], loss_fn_str=hyper_params['loss']['reg'])
 
@@ -1234,34 +1342,35 @@ def get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hy
     # Model checkpoint callback to save the best model
     checkpoint_callback = ModelCheckpoint(
         monitor='val_losses',        # Monitors validation loss
-        dirpath='checkpoints/',    # Directory to save checkpoints
-        filename='best-checkpoint', # Checkpoint filename
+        dirpath=model_to_save_name,    # Directory to save checkpoints
+        filename='{epoch}-best-val-R2', # Checkpoint filename
         save_top_k=1,              # Only save the best model
-        mode='min',                 # Minimize the validation loss
+        mode='max',                 # Minimize the validation loss
         enable_version_counter = False # Whether to append a version to the existing file name.
     )
+
+    # prepare a trainer
+    print(model_to_save_name)
     
     trainer = pl.Trainer(logger=False, accelerator = 'gpu',
                          max_epochs=hyper_params['max_epochs'],
                          num_sanity_val_steps = 0,
-                         callbacks=[MyProgressBar(refresh_rate=10)] # early_stopping, checkpoint_callback, 
-                         #default_root_dir=suptrain_models_folder+suptrain_model_to_save_name
+                         callbacks=[MyProgressBar(), checkpoint_callback] # early_stopping 
                         )
     trainer.fit(model, train_loader, val_loader)
     print(ModelSummary(model, max_depth=-1))
     
     # Load the best checkpoint after training
-    #best_model_path = checkpoint_callback.best_model_path
-    #best_model = MLPRegressor.load_from_checkpoint(best_model_path)
+    best_model_path = checkpoint_callback.best_model_path
+    best_model = MLPRegressor.load_from_checkpoint(best_model_path)
+    print('best model filename: ', best_model_path)
     #best_model.save(model_to_save_name)
-    # Now `best_model` has the weights from the best validation epoch
 
     print(len(model.train_losses))
     print(len(model.val_losses))
-    print(len(model.val_mapes))
     history = {'train_losses': model.train_losses,
-               'val_losses': model.val_losses,
-               'val_mapes': model.val_mapes}
+               'val_losses': model.val_losses}
+    model = best_model
 
     return model, history
 
@@ -1328,8 +1437,9 @@ def train_model (X_train, X_val, y_train, y_val, sup_model_type, learning_task_t
     
     if sup_model_type == 'mlp': 
         model, history = get_pytorch_mlp_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
-        plt_str='loss_curve_switchtab.pdf'
-        plot_model_train_info (history['train_losses'], history['val_losses'], 'plots/'+plt_str)
+        plt_str='loss_curve.pdf'
+        #plot_model_train_info (history['train_losses'], history['val_losses'], 'plots/'+plt_str)
+        plot_model_val_info (history['val_losses'], 'plots/'+plt_str)
     elif sup_model_type == 'xgb':
         model, history = get_xgb_model(X_train, y_train, X_val, y_val, model_to_save_name, hyper_params, learning_task_type)
     elif sup_model_type == 'tabnet':

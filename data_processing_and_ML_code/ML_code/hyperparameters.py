@@ -2,6 +2,7 @@
 
 # Hyperparameters for supervised XGB training 
 hypp_sup_xgb_small={
+    'n_jobs': 5,
     'learning_rate': 0.1,
     'n_estimators': 50,
     'max_depth': 3,
@@ -9,6 +10,7 @@ hypp_sup_xgb_small={
             'clas':'categorical_crossentropy'}
 } 
 hypp_sup_xgb_large={
+    'n_jobs': 5,
     'learning_rate': 0.01,
     'n_estimators': 200,
     'max_depth': 6,
@@ -18,27 +20,29 @@ hypp_sup_xgb_large={
 
 # Hyperparameters for supervised MLP training
 hypp_sup_mlp={
-    'fc_layers': None, # Should be taken as input parameter to this function
+    #'fc_layers': None, # Should be taken as input parameter to this function
+    'n_jobs': 5,
     'batch_size': None, # will get set based on number of labelled samples   
-    'max_epochs': 100,# 100 
+    'max_epochs': 30,# 100 
+    'hidden_dim': 200,
+    'depth': 1,# an additional layer is added as part of the prediction head so the actual depth will be this +1
     'patience': 15,
     'learning_rate': 0.0001,
     'use_batchnorm': False,
-    'use_dropout': False,
-    'dropout_rate': 0.0,
+    'dropout_rate': 0.1,
     'loss':{'reg':'MSELoss',#'MSELoss', 'L1Loss', SmoothL1Loss
             'clas':'categorical_crossentropy'},
-    'metrics':{
-               'reg':['MSELoss'],
-               'clas':['Recall']},
+    #'metrics':{
+    #           'reg':['R2Score'],
+    #           'clas':['Recall']},
     'out_activation':{'reg':'linear', 
-                      'clas':'softmax'} 
+                      'clas':'softmax'}
 }
 
 s3l_hyp_pred_head={
     # I am setting this in code directly since I want to use different batch sizes for different sample siezes
     'batch_size': None,
-    'max_epochs': 1, # 30
+    'max_epochs': 30, # 30
     'patience': 5,
     'loss':{'reg': 'MSELoss', #'L1Loss',
             'clas':'CrossEntropyLoss'},
@@ -47,17 +51,18 @@ s3l_hyp_pred_head={
 }
 
 s3l_hyp_ssl_dae={
+    'n_jobs': 5,
     'loss_fn': "MSELoss",
     #'metric': ["r2_score", "mean_absolute_error"], #
     'metric': "r2_score", #
     'hidden_dim': 200, #
     'max_epochs': 100, #
-    'batch_size': 128, #
+    'batch_size': 128, # only used for first phase
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
     
-    'encoder_depth': 4, #  
+    'encoder_depth': 8, #  
     'head_depth': 2, #
     'dropout_rate': 0.1, #
     
@@ -66,16 +71,17 @@ s3l_hyp_ssl_dae={
 }
 
 s3l_hyp_ssl_scarf={
+    'n_jobs': 5,
     'loss_fn': "MSELoss",
     #'metric': ["r2_score", "mean_absolute_error"], #
     'metric': "r2_score", #
     'hidden_dim': 200,
     'max_epochs': 100,
-    'batch_size': 128,
+    'batch_size': 128, # only used for first phase
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
     
-    'encoder_depth': 4,
+    'encoder_depth': 8,
     'head_depth': 2,
     'dropout_rate': 0.1, #
     
@@ -83,16 +89,17 @@ s3l_hyp_ssl_scarf={
 }
 
 s3l_hyp_ssl_vime={
+    'n_jobs': 30,
     'loss_fn': "MSELoss",
     #'metric': ["r2_score", "mean_absolute_error"], #
     'metric': "r2_score", #
     'hidden_dim': 200, #
     'max_epochs': 100, #
-    'batch_size': 128, #
+    'batch_size': 128, # only used for first phase
     # not used in the config yet
     'optim_hparams': {'lr': 0.0001, 'weight_decay': 0.00005},
 
-    'encoder_depth': 4, #  
+    'encoder_depth': 8, #  
     'head_depth': 2,
     'dropout_rate': 0.1, #
     
@@ -101,10 +108,11 @@ s3l_hyp_ssl_vime={
     'alpha1': 2.0, # Hyper-parameter to control the weights of feature and mask losses
     'alpha2': 2.0, # Hyper-parameter to control the weights of feature and mask losses
     'K': 3, # Number of augmented samples
-    'beta': 0.2 # Hyperparameter to control supervised and unsupervised losses
+    'beta': 1.0 # Hyperparameter to control supervised and unsupervised losses
 }
 
 s3l_hyp_ssl_subtab={
+    'n_jobs': 5,
     'loss_fn': "MSELoss",
     #'metric': ["r2_score", "mean_absolute_error"], #
     'metric': "r2_score", #
@@ -130,6 +138,7 @@ s3l_hyp_ssl_subtab={
 }
 
 s3l_hyp_ssl_switchtab={
+    'n_jobs': 5,
     'loss_fn': "MSELoss",
     #'metric': ["r2_score", "mean_absolute_error"], #
     'metric': "r2_score", #

@@ -22,8 +22,11 @@ def s3l_training(pretrain, use_pretrained_model,
                  sup_model_type = '',
                  # Baseline
                  random_initialize_model=False,
+                 # If random_initialize_model = True
+                 baseline_encoder_depth=None,
+                 baseline_hidden_dim=None,
                  # if mlp 
-                 sup_mlp_layers = None,
+                 #sup_mlp_layers = None,
                  SP_results_folder='', pt_folder='', 
                  freeze_encoder=True, pred_head_size=None, 
                  shift_samp_for_predict = True # If True then we are predicting one window ahead if False then we are predicting on the same window
@@ -32,11 +35,12 @@ def s3l_training(pretrain, use_pretrained_model,
     #==========================
     # INITIALIZE
     #==========================
+    torch.multiprocessing.set_sharing_strategy('file_system')
     
     first_pass = True
     # Sets the random seed 
-    initialize(561)
-    #initialize(420)
+    RAND_SEED = 561
+    initialize(RAND_SEED)
     print(torch.cuda.is_available())
     print(torch.version.cuda)
     notebook_save_str = 's3l_'+pt_type
@@ -55,12 +59,11 @@ def s3l_training(pretrain, use_pretrained_model,
     test_slice = 'all' #['macro', 'micro', 'slow', 'fast', 'all']
     EXP_PARAM = {
         'scaler': 'standard', #'minmax', 'standard', 'robust', 'maxabs', 'l2norm'
-        'num_rand_runs': 1 # number of runs with each run doing a different random sample of size label_no from the set of labeled samples 
+        'num_rand_runs': 10 # number of runs with each run doing a different random sample of size label_no from the set of labeled samples 
     }
     
-    #num_samples_list = [100, 1*K, 10*K, 20*K]
-    #num_samples_list = [100, 250, 500, 1*K, 10*K, 20*K]
-    num_samples_list = [1000, 20*K]
+    num_samples_list = [100, 250, 500, 1*K, 10*K, 20*K]
+    #num_samples_list = [100, 20*K]
     
     #==================================
     # Pretraining Experiment Parameters
@@ -96,18 +99,24 @@ def s3l_training(pretrain, use_pretrained_model,
                                   
     # These are the ones we have chosen to work with  
     learning_tasks = [#'dashClient_trace.txt_newBitRate_bps', 
-                      'vrFragment_trace.txt_vr_frag_thput_mbps', 'vrFragment_trace.txt_vr_burst_thput_mbps',
-                      'vrFragment_trace.txt_vr_frag_time', 'vrFragment_trace.txt_vr_burst_time', 
+                      'vrFragment_trace.txt_vr_frag_thput_mbps', 
+                      'vrFragment_trace.txt_vr_burst_thput_mbps',
+                      'vrFragment_trace.txt_vr_frag_time', 
+                      'vrFragment_trace.txt_vr_burst_time', 
                       #'httpClientRtt_trace.txt_page_load_time',
                       #'delay_trace.txt_ul_delay', 
-                      'delay_trace.txt_dl_delay']
+                      'delay_trace.txt_dl_delay'
+                     ]
     # index matched with the learning_tasks above
     learning_task_types = [#'clas', 
-                           'reg', 'reg', 
-                           'reg', 'reg',
+                           'reg', 
+                           'reg', 
+                           'reg', 
+                           'reg',
                            #'reg',
                            #'reg', 
-                           'reg'] 
+                           'reg'
+                          ] 
     
     # If you want the test samples to be sorted by delay value to see the error differences for the low delay and high delay cases 
     sort_test_samples = False
@@ -124,15 +133,16 @@ def s3l_training(pretrain, use_pretrained_model,
     clip_outliers = True
     delay_clip_th = 5000 # ms
     
-    #num_train_runs = 7 # 7 
-    #num_test_runs = 3 # 3
-    #train_test_run_nums = np.array(range(11, 20+1))
-    num_train_runs = 1 # 7 
-    num_test_runs = 1 # 3
-    train_test_run_nums = np.array(range(11, 12+1))
+    num_train_runs = 7 # 7 
+    num_test_runs = 3 # 3
+    train_test_run_nums = np.array(range(11, 20+1))
+    # debug
+    #num_train_runs = 1 # 7 
+    #num_test_runs = 1 # 3
+    #train_test_run_nums = np.array(range(11, 12+1))
     
-    #pretrain_runs = range(1, 10 + 1)
-    pretrain_runs = range(1, 1 + 1)
+    pretrain_runs = range(1, 10 + 1)
+    #pretrain_runs = range(1, 1 + 1)
     
     # Create the pretrain_models_folder if it does not already exist
     if not os.path.isdir(pretrain_models_folder):
@@ -144,14 +154,21 @@ def s3l_training(pretrain, use_pretrained_model,
     
     if pretrain: 
         # Read the pretraining data
-        pretrain_data = read_and_concatenate_runs(pretrain_runs, dataset_folder, 
+        pretrain_data_dict = read_all_runs(pretrain_runs, dataset_folder, 
                                                   pretrain_slice, network_info, time_step_size, 
                                                   use_all_feats, drop_col_substr, learning_tasks, 
                                                   shift_samp_for_predict, 
                                                   impute_method, sum_cols_substr, all_learning_tasks_in_data)
+        pretrain_data = concatenate_runs(pretrain_runs, pretrain_data_dict)
+        
+        #pretrain_data = read_and_concatenate_runs(pretrain_runs, dataset_folder, 
+        #                                          pretrain_slice, network_info, time_step_size, 
+        #                                          use_all_feats, drop_col_substr, learning_tasks, 
+        #                                          shift_samp_for_predict, 
+        #                                          impute_method, sum_cols_substr, all_learning_tasks_in_data)
+        
         
         X_pretrain = make_data_pretrain_ready (pretrain_data, learning_tasks, all_learning_tasks_in_data, unlab_dataset_scenario)
-        
         X_cols = X_pretrain.columns
         continuous_cols = list(set(X_cols) - set(categorical_cols))
     
@@ -221,16 +238,27 @@ def s3l_training(pretrain, use_pretrained_model,
     open(test_results_filepath, 'w').close()
 
     # VIME needs unlabeled data for it's semi supervised learning in SP
-    if pretrain_model_to_load_type == 's3l_vime':
+    if (not random_initialize_model) and (pretrain_model_to_load_type == 's3l_vime'):
         # Read the pretraining data
-        pretrain_data = read_and_concatenate_runs(pretrain_runs, dataset_folder, 
+        pretrain_data_dict = read_all_runs(pretrain_runs, dataset_folder, 
                                                   pretrain_slice, network_info, time_step_size, 
                                                   use_all_feats, drop_col_substr, learning_tasks, 
                                                   shift_samp_for_predict, 
                                                   impute_method, sum_cols_substr, all_learning_tasks_in_data)
+        pretrain_data = concatenate_runs(pretrain_runs, pretrain_data_dict)
+        
+        #pretrain_data = read_and_concatenate_runs(pretrain_runs, dataset_folder, 
+        #                                          pretrain_slice, network_info, time_step_size, 
+        #                                          use_all_feats, drop_col_substr, learning_tasks, 
+        #                                          shift_samp_for_predict, 
+        #                                          impute_method, sum_cols_substr, all_learning_tasks_in_data)
         
         X_pretrain = make_data_pretrain_ready (pretrain_data, learning_tasks, all_learning_tasks_in_data, unlab_dataset_scenario)
         X_cols = X_pretrain.columns        
+        #sample from this to get the number of unlabeled samples I want to use in my VIME SP learning 
+        print(X_pretrain.shape)
+        X_pretrain = X_pretrain.sample(n=20000, random_state=RAND_SEED)
+        print(X_pretrain.shape)
         # Load the saved Scaler object from the file
         with open(pretrain_models_folder + scaler_to_load_name, 'rb') as f:
             val_scaler = pickle.load(f)
@@ -239,6 +267,16 @@ def s3l_training(pretrain, use_pretrained_model,
     else:
         X_pretrain = None
         
+
+    # =================================================
+    # READ ALL THE DATA BEFORE STARTING THE LOOP
+    # =================================================
+
+    train_test_data_dict = read_all_runs(train_test_run_nums, dataset_folder, 
+                                                  pretrain_slice, network_info, time_step_size, 
+                                                  use_all_feats, drop_col_substr, learning_tasks, 
+                                                  shift_samp_for_predict, 
+                                                  impute_method, sum_cols_substr, all_learning_tasks_in_data)
     
     # =================================================
     # LOOP OVER DIFFERENT NUMBER OF LABELED SAMPLES
@@ -278,12 +316,20 @@ def s3l_training(pretrain, use_pretrained_model,
             print('test runs used ', test_runs)
             
             # Read the runs from files and creater a train and test dataset 
-            train_data = read_and_concatenate_runs (train_runs, dataset_folder, train_slice, network_info, time_step_size, 
-                                                   use_all_feats, drop_col_substr, learning_tasks, shift_samp_for_predict, 
-                                                   impute_method, sum_cols_substr, all_learning_tasks_in_data)
-            test_data = read_and_concatenate_runs (test_runs, dataset_folder, test_slice, network_info, time_step_size, 
-                                                  use_all_feats, drop_col_substr, learning_tasks, shift_samp_for_predict, 
-                                                  impute_method, sum_cols_substr, all_learning_tasks_in_data)
+            #train_data = read_and_concatenate_runs (train_runs, dataset_folder, train_slice, network_info, time_step_size, 
+            #                                       use_all_feats, drop_col_substr, learning_tasks, shift_samp_for_predict, 
+            #                                       impute_method, sum_cols_substr, all_learning_tasks_in_data)
+            #test_data = read_and_concatenate_runs (test_runs, dataset_folder, test_slice, network_info, time_step_size, 
+            #                                      use_all_feats, drop_col_substr, learning_tasks, shift_samp_for_predict, 
+            #                                      impute_method, sum_cols_substr, all_learning_tasks_in_data)
+            #print(train_data.shape)
+            #print(test_data.shape)
+            
+            train_data = concatenate_runs(train_runs, train_test_data_dict)
+            test_data = concatenate_runs(test_runs, train_test_data_dict)
+
+            print(train_data.shape)
+            print(test_data.shape)
             print('Time to read data: ', time.time() - read_data_start_time)
             
             # =================================================
@@ -332,41 +378,58 @@ def s3l_training(pretrain, use_pretrained_model,
                     # This functions helps me random sample with stratification 
                     X_train, _, y_train, _ = train_test_split(X_train, y_train,
                                                                           train_size=EXP_PARAM['label_no'], shuffle=True,
-                                                                          stratify=train_strat_array)
+                                                                          stratify=train_strat_array, random_state=RAND_SEED)
                 
                 # create a validation set from the test set 
+                # Make the testset smaller for delay prediction since otherwise it has 500K samples 
+                # sample 10 K samples
+                if learning_task == 'delay_trace.txt_dl_delay':
+                    test_set_size=int(min(X_test.shape[0], 10000))
+                else:
+                    test_set_size=None
+                #test_set_size=None
                 X_test, X_val, y_test, y_val = train_test_split(X_test, y_test,
-                                                                test_size=int(min(X_train.shape[0], 0.25*X_test.shape[0])),    
-                                                                shuffle=True, stratify=test_strat_array)  
+                                                                train_size=test_set_size, 
+                                                                test_size=int(min(X_train.shape[0], 0.25*X_test.shape[0])), 
+                                                                shuffle=True, stratify=test_strat_array, random_state=RAND_SEED)  
                 
                 print('Train data shape ' + str(X_train.shape))
                 print('Test data shape ' + str(X_test.shape))
                 print('Val data shape ' + str(X_val.shape))
+                #print('Coefficient of variance (y_train, y_test) ', np.std(y_train)/np.mean(y_train), np.std(y_test)/np.mean(y_test))
+                
+                scale_summarize_array(y_test)
+                #print('Kurtosis (y_train, y_test) ', kurtosis(y_train), kurtosis(y_test))
                 #plot_hist_of_y(y_train, y_test, learning_task)
                 print('Time to process data for one learning task: ', time.time() - task_it_start_time)
                 # X_train and X_test are pandas dataframes here 
+                #continue
+                
+                
+                
+                
+                
                 #=============================================== Train and test the model ==================================
             
                 start_time = time.time()                    
                     
-                # =================================================
+                # ====================================================
                 # USE SSL MODEL OR USE RANDOMLY INITIALIZED SSL MODEL
-                # =================================================
+                # ====================================================
                 if use_pretrained_model or random_initialize_model:
                     
                     #==========================
                     # INITIALIZE
                     #==========================
-                    
-                    assert (pretrain_model_to_load_type in ['s3l_dae', 's3l_vime', 's3l_scarf', 's3l_subtab', 's3l_switchtab'], 
-                            f"Invalid pretrain_model_to_load_type: {pretrain_model_to_load_type}.")
-                    assert (pred_head_type in ['xgb', 'ts3l'], 
-                            f"Invalid pred_head_type: {pred_head_type}.")
                     if pred_head_type == 'ts3l':
                         assert (pred_head_size in [1, 2], 
                             f"Invalid pred_head_size: {pred_head_size}.")
                     
                     if use_pretrained_model: 
+                        assert (pretrain_model_to_load_type in ['s3l_dae', 's3l_vime', 's3l_scarf', 's3l_subtab', 's3l_switchtab'], 
+                            f"Invalid pretrain_model_to_load_type: {pretrain_model_to_load_type}.")
+                        assert (pred_head_type in ['xgb', 'ts3l'], 
+                            f"Invalid pred_head_type: {pred_head_type}.")
                         # Load the saved Scaler object from the file
                         with open(pretrain_models_folder + scaler_to_load_name, 'rb') as f:
                             val_scaler = pickle.load(f)
@@ -391,27 +454,29 @@ def s3l_training(pretrain, use_pretrained_model,
                     else: # when it is greater
                         s3l_hyp_pred_head['batch_size'] = 200
                         sup_hyper_params=hypp_sup_xgb_large
-                        
-                    if pretrain_model_to_load_type == 's3l_vime':
-                            s3l_hyp_pred_head['batch_size'] = 2000 
 
                     if use_pretrained_model: 
+                        if pretrain_model_to_load_type == 's3l_vime':
+                            if EXP_PARAM['label_no'] <= 5000:
+                                s3l_hyp_pred_head['batch_size'] = 2000 
+                            else:
+                                s3l_hyp_pred_head['batch_size'] = 400
+                            
                         # load the model
                         ssl_model = s3l_load(pretrain_models_folder+pretrain_model_to_load_name+'.ckpt', pretrain_model_to_load_type)
-                        if first_pass:
-                            print(ModelSummary(ssl_model, max_depth=-1))
-                            print('HYPERPARAMETERS: ', s3l_hyp_pred_head)
-                            first_pass = False
                     else: #random_initialize_model
+                        s3l_hyp_pred_head['encoder_depth'] = baseline_encoder_depth
+                        s3l_hyp_pred_head['hidden_dim'] = baseline_hidden_dim
                         # Create a new model that is randomly initialized
                         ssl_model = initialize_s3l_model_random(type=pretrain_model_to_load_type, input_dim=X_train.shape[1], 
-                                                    categorical_cols=categorical_cols, continuous_cols=continuous_cols)
-                        if first_pass:
-                            print(ModelSummary(ssl_model, max_depth=-1))
-                            print('HYPERPARAMETERS: ', s3l_hyp_pred_head)
-                            first_pass = False
+                                                    categorical_cols=categorical_cols, continuous_cols=continuous_cols, 
+                                                    encoder_depth=s3l_hyp_pred_head['encoder_depth'], hidden_dim=s3l_hyp_pred_head['hidden_dim'])
+                        X_pretrain = None # dont need this for baseline
                         
-
+                    if first_pass:
+                        print(ModelSummary(ssl_model, max_depth=-1))
+                        print('HYPERPARAMETERS: ', s3l_hyp_pred_head)
+                        first_pass = False
                     # Create the datamodeule needed for second phase training and the dataloaders needed for evaluation  
                     datamodule, train_dl, test_dl = prepare_dataloaders(pretrain_model_to_load_type, 
                                         X_train, y_train,
@@ -421,16 +486,14 @@ def s3l_training(pretrain, use_pretrained_model,
                                         batch_size = s3l_hyp_pred_head['batch_size'],
                                         X_pretrain=X_pretrain)
                     
-                    
+                    # set model to second phase
+                    ssl_model.set_second_phase(freeze_encoder=freeze_encoder, pred_head_size=pred_head_size)
                     #============================
                     # TRAIN AND MAKE PREDICTIONS
                     #============================
                     
-                    # set model to second phase
-                    ssl_model.set_second_phase(freeze_encoder=freeze_encoder, pred_head_size=pred_head_size)
-                    
                     # =================================================
-                    # USE XGB PREDICTION HEAD 
+                    # USE XGB PREDICTION HEAD after using a pretrained model 
                     # =================================================
                     if pred_head_type == 'xgb':
 
@@ -476,7 +539,8 @@ def s3l_training(pretrain, use_pretrained_model,
                     # USE TS3L INBUILT PREDICTION HEAD 
                     # =================================================
                     elif pred_head_type == 'ts3l':
-                        
+
+                        start_time_train = time.time()
                         # prepare a trainer 
                         best_ckpt_save_path = suptrain_models_folder+suptrain_model_to_save_name
                         model_checkpoint = get_best_r2_checkpoint(best_ckpt_save_path)
@@ -484,12 +548,18 @@ def s3l_training(pretrain, use_pretrained_model,
                         sup_trainer = Trainer(logger=False, accelerator = 'gpu',
                                               max_epochs = s3l_hyp_pred_head['max_epochs'], 
                                               enable_progress_bar=True,
-                                              callbacks=[MyProgressBar(), model_checkpoint]
+                                              log_every_n_steps=50,
+                                              callbacks=[MyProgressBar(refresh_rate=10), model_checkpoint]
+                                              # SimpleProgressBar(), 
+                                              #MyProgressBar()
+                                              #profiler="advanced"
                                              )
                         # Train
                         sup_trainer.fit(ssl_model, datamodule)
+                        print('Time to train SP for this task: ', time.time() - start_time_train)
                         # Plot the validation metric 
                         plot_model_val_info(ssl_model.second_phase_val_metric)
+                        
                         
                         # Load the best model 
                         print(f"Best model path: {model_checkpoint.best_model_path}")
@@ -502,10 +572,10 @@ def s3l_training(pretrain, use_pretrained_model,
                         if learning_task_type == 'reg':
                             yhat_test = sup_trainer.predict(ssl_model, test_dl)
                             yhat_test = torch.concat([out.cpu().unsqueeze(0) if out.dim() == 0 else out.cpu() for out in yhat_test]).squeeze()
-                            inf_time = time.time()
+                            #inf_time = time.time()
                             yhat_train = sup_trainer.predict(ssl_model, train_dl)
                             yhat_train = torch.concat([out.cpu().unsqueeze(0) if out.dim() == 0 else out.cpu() for out in yhat_train]).squeeze()
-                            print('Inference time per batch is: ', (time.time()-inf_time)*s3l_hyp_pred_head['batch_size']/len(yhat_train))
+                            #print('Inference time per batch is: ', (time.time()-inf_time)*s3l_hyp_pred_head['batch_size']/len(yhat_train))
                             
                             # Clip predictions to the range of the training data
                             print('NOTE: Clipping the predictions to be within the range of the ground-truth values')
@@ -520,6 +590,20 @@ def s3l_training(pretrain, use_pretrained_model,
                             yhat_train = yhat_train_proba.argmax(1)
                             yhat_test = yhat_test_proba.argmax(1)
 
+                        # Clean up the trainer
+                        del sup_trainer
+                    
+                    del datamodule.train_dataloader()._iterator #._shutdown_workers()
+                    del datamodule.val_dataloader()._iterator #._shutdown_workers()
+                    del train_dl._iterator #._shutdown_workers()
+                    del test_dl._iterator #._shutdown_workers()
+                    torch.cuda.empty_cache()  # Free GPU memory
+                    del datamodule
+                    del train_dl 
+                    del test_dl
+                    print('Shutdown all workers and deleted dataloaders and Trainer')
+                        
+
                 # =================================================
                 # DONT LOAD SSL MODEL, DIRECTLY USE LABELED DATA 
                 # =================================================
@@ -532,6 +616,7 @@ def s3l_training(pretrain, use_pretrained_model,
                             f"Invalid sup_model_type: {sup_model_type}.")
                     
                     val_scaler = create_format_specific_scaler(X_train, categorical_cols, EXP_PARAM['scaler'])
+                    
                     # save the scaler model to a file
                     with open(suptrain_models_folder + scaler_to_save_name + '.pkl', 'wb') as f:
                         pickle.dump(val_scaler, f)  
@@ -542,9 +627,9 @@ def s3l_training(pretrain, use_pretrained_model,
                         if EXP_PARAM['label_no'] <= 5000:
                             sup_hyper_params['batch_size'] = 10
                         else: # when it is greater
-                            sup_hyper_params['batch_size'] = 50
+                            sup_hyper_params['batch_size'] = 200
                         print('Setting batch_size to ', sup_hyper_params['batch_size'])
-                        sup_hyper_params['fc_layers'] = sup_mlp_layers
+                        #sup_hyper_params['fc_layers'] = sup_mlp_layers
                     elif sup_model_type == 'xgb':
                         if EXP_PARAM['label_no'] <= 5000:
                             sup_hyper_params=hypp_sup_xgb_small  
@@ -579,9 +664,14 @@ def s3l_training(pretrain, use_pretrained_model,
                         else: # pytorch mlp
                             # Set to inference mode. This disables regularization. 
                             model.eval()
+
+                            # Move tensors to the same device as the model
+                            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                            
                             with torch.no_grad():
-                                yhat_train = model(torch.tensor(X_train, dtype=torch.float32)).numpy()
-                                yhat_test = model(torch.tensor(X_test, dtype=torch.float32)).numpy()
+
+                                yhat_train = model(torch.tensor(X_train, dtype=torch.float32).to(device)).cpu().numpy()
+                                yhat_test = model(torch.tensor(X_test, dtype=torch.float32).to(device)).cpu().numpy()
                         
                         # Clip predictions to the range of the training data
                         print('NOTE: Clipping the predictions to be within the range of the ground-truth values')
@@ -610,7 +700,8 @@ def s3l_training(pretrain, use_pretrained_model,
                 #===============================================================
                 # COMPUTE ERROR AFTER TRAINING WITH LABELED DATA  
                 #===============================================================
-                plot_save_path='plots/q-q_'+pt_type+'_T'+str(idx+1)+'_rand'+str(rs)+'_'+str(label_no)+'.pdf'
+                #plot_save_path='plots/q-q_'+pt_type+'_T'+str(idx+1)+'_rand'+str(rs)+'_'+str(label_no)+'.pdf'
+                plot_save_path=None # won't save the plot this way 
                 train_results, test_results = compute_plot_save_error(y_train, yhat_train, 
                                                                       y_test, yhat_test, 
                                                                       learning_task, learning_task_type, 
