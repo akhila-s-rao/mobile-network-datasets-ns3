@@ -3,6 +3,9 @@ This project contains scripts to generate datasets from ns-3 4G and 5G mobile ne
 
 It also contains scripts to parse the data, do sanity checks on them and visualize it in various ways.  
 
+Finally it also contains the machine learning code repository that has the code for the results in the paper "Self-supervised Pretraining for User Performance Prediction under Scarce Data Conditions"
+
+
 # Install instructions
 This is a full ns-3 installation along with the additional modules and changes to the base code. 
 
