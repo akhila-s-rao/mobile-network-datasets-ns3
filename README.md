@@ -1,9 +1,9 @@
 # mobile-network-datasets-ns3
-This project contains scripts to generate datasets from ns-3 4G and 5G mobile networks. It comes packaged with the base ns-3 module along with additional third party ns-3 modules that are required to generate diverse datasets. 
-
-It also contains scripts to parse the data, do sanity checks on them and visualize it in various ways.  
-
-Finally it also contains the machine learning code repository that has the code for the results in the paper [Self-supervised Pretraining for User Performance Prediction under Scarce Data Conditions](https://www.techrxiv.org/users/883047/articles/1261614-self-supervised-pretraining-for-user-performance-prediction-under-scarce-data-conditions)
+This repository contains the following 
+- A dataset creation framework based on the ns-3 simulator to create telecom network datasets in diverse scenarios. It comes packaged with the base ns-3 module along with additional third party ns-3 modules.
+- A link to curated datasets created using this framework based on scenarios from the ETSI report, [A 5G Study on Scenarios and Requirements for Next Generation Access Technologies](https://www.etsi.org/deliver/etsi_tr/138900_138999/138913/14.02.00_60/tr_138913v140200p.pdf)   
+- Data preprocessing code to parse the logs into datasets ready for machine learning training, code for performing sanity checks on them and visualization.
+- Code for setting up the machine learning project as described in the paper [Self-supervised Pretraining for User Performance Prediction under Scarce Data Conditions](https://www.techrxiv.org/users/883047/articles/1261614-self-supervised-pretraining-for-user-performance-prediction-under-scarce-data-conditions)
 
 
 # Install instructions for ns-3 Dataset Creation Framework
