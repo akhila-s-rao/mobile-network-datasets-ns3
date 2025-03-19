@@ -6,7 +6,7 @@ It also contains scripts to parse the data, do sanity checks on them and visuali
 Finally it also contains the machine learning code repository that has the code for the results in the paper "Self-supervised Pretraining for User Performance Prediction under Scarce Data Conditions"
 
 
-# Install instructions
+# Install instructions for ns-3 Dataset Creation Framework
 This is a full ns-3 installation along with the additional modules and changes to the base code. 
 
 ## Step 1: Clone the repository 
