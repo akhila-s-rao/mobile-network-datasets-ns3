@@ -40,13 +40,13 @@ bash run_script.sh
 https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sharing
 
 ### Deployment illustration
-![Deployment illustration](deployment_illustration.png| width=100)
+![Deployment illustration](deployment_illustration.png | width=100)
 
 ### Table of observable metrics 
-![Table of observable metrics](observable_metrics_table.png| width=100)
+![Table of observable metrics](observable_metrics_table.png | width=100)
 
 ### Table of deployment and setup parameters
-![Table of deployment and setup parameters](parameters_table2.png| width=100)
+![Table of deployment and setup parameters](parameters_table2.png | width=100)
 
 ## Acknowledgement
 This work was funded by the H2020 AI@EDGE project (grant. no. 101015922)
