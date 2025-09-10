@@ -39,6 +39,9 @@ bash run_script.sh
 ### Curated datasets generated from these scripts can be found at (google drive link)
 https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sharing
 
+### Deployment illustration
+![Deployment illustration](deployment_illustration.png)
+
 ### Table of observable metrics 
 ![Table of observable metrics](observable_metrics_table.png)
 
