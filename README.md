@@ -43,10 +43,10 @@ https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sha
 <img src="deployment_illustration.png" alt="Deployment illustration" style="width:50%; height:auto;">
 
 ### Table of observable metrics 
-![Table of observable metrics](observable_metrics_table.png | width=100)
+<img src="observable_metrics_table.png" alt="Table of observable metrics" style="width:90%; height:auto;">
 
 ### Table of deployment and setup parameters
-![Table of deployment and setup parameters](parameters_table2.png | width=100)
+<img src="parameters_table2.png" alt="Table of deployment and setup parameters" style="width:70%; height:auto;">
 
 ## Acknowledgement
 This work was funded by the H2020 AI@EDGE project (grant. no. 101015922)
