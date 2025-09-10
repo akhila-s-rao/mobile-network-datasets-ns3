@@ -40,7 +40,7 @@ bash run_script.sh
 https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sharing
 
 ### Deployment illustration
-![Deployment illustration](deployment_illustration.png | width=100)
+<img src="deployment_illustration.png" alt="Deployment illustration" style="width:50%; height:auto;">
 
 ### Table of observable metrics 
 ![Table of observable metrics](observable_metrics_table.png | width=100)
