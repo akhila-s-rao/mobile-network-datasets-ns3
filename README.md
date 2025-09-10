@@ -43,7 +43,7 @@ https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sha
 ![Table of observable metrics](observable_metrics_table.png)
 
 ### Table of deployment and setup parameters
-![Table of deployment and setup parameters](parameters_table.png)
+![Table of deployment and setup parameters](parameters_table2.png)
 
 ## Acknowledgement
 This work was funded by the H2020 AI@EDGE project (grant. no. 101015922)
