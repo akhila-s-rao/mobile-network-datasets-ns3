@@ -41,15 +41,18 @@ https://drive.google.com/drive/folders/1-OQolvhK1mpFNFVLF4XTC_c3_EjLPwz-?usp=sha
 
 ### Deployment illustration
 <img src="deployment_illustration.png" alt="Deployment illustration" style="width:50%; height:auto;">
-[FDASH] Vergados DJ, Michalas A, Sgora A, Vergados DD, Chatzimisios P. FDASH: A fuzzy-based MPEG/DASH adaptation algorithm. IEEE Systems Journal. 2015 Dec 29;10(2):859-68
-[Channel model] ETSI TR 138 901 V16.1.0 (2020-11) 5G Study on channel model for frequencies from 0.5 to 100 GHz
-[VR] Lecci M, Zanella A, Zorzi M. An ns-3 implementation of a bursty traffic framework for virtual reality sources. InProceedings of the 2021 Workshop on ns-3 2021 Jun 23 (pp. 73-80)
 
 ### Table of observable metrics 
 <img src="observable_metrics_table.png" alt="Table of observable metrics" style="width:90%; height:auto;">
 
 ### Table of deployment and setup parameters
 <img src="parameters_table2.png" alt="Table of deployment and setup parameters" style="width:70%; height:auto;">
+
+[FDASH] Vergados DJ, Michalas A, Sgora A, Vergados DD, Chatzimisios P. FDASH: A fuzzy-based MPEG/DASH adaptation algorithm. IEEE Systems Journal. 2015 Dec 29;10(2):859-68
+
+[Channel model] ETSI TR 138 901 V16.1.0 (2020-11) 5G Study on channel model for frequencies from 0.5 to 100 GHz
+
+[VR] Lecci M, Zanella A, Zorzi M. An ns-3 implementation of a bursty traffic framework for virtual reality sources. InProceedings of the 2021 Workshop on ns-3 2021 Jun 23 (pp. 73-80)
 
 ## Acknowledgement
 This work was funded by the H2020 AI@EDGE project (grant. no. 101015922)
